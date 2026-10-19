@@ -378,22 +378,25 @@ async function downloadWithYtDlp(url, specificArgs) {
   const attempts = [];
   const hasCookies = checkValidCookies();
 
-  // Sem cookies: tenta os clientes menos inspecionados primeiro.
-  // "tv,web_safari" numa única tentativa = yt-dlp tenta em ordem.
+  // Com cookies REAIS válidos, tenta PRIMEIRO: sem cookies o YouTube
+  // bloqueia o IP do servidor, então começar pelas tentativas "sem cookies"
+  // só gasta tempo (e enche o log de erros) antes de chegar na que funciona.
+  // Usa web_safari/mweb: cookies + client "tv" invalidam a sessão.
+  if (hasCookies) {
+    attempts.push({ name: 'web_safari + cookies', withCookies: true, client: 'web_safari' });
+    attempts.push({ name: 'mweb + cookies', withCookies: true, client: 'mweb' });
+    attempts.push({ name: 'padrao + cookies', withCookies: true, client: null });
+  }
+
+  // Sem cookies (ou como reserva, se os cookies expirarem): clientes menos
+  // inspecionados primeiro. "tv,web_safari" numa única tentativa = yt-dlp
+  // tenta os dois em ordem.
   attempts.push({ name: 'tv+web_safari (sem cookies)', withCookies: false, client: 'tv,web_safari' });
   attempts.push({ name: 'android_vr (sem cookies)', withCookies: false, client: 'android_vr' });
   attempts.push({ name: 'mweb (sem cookies)', withCookies: false, client: 'mweb' });
   attempts.push({ name: 'ios (sem cookies)', withCookies: false, client: 'ios' });
   attempts.push({ name: 'android (sem cookies)', withCookies: false, client: 'android' });
   attempts.push({ name: 'padrao (sem cookies)', withCookies: false, client: null });
-
-  // Com cookies REAIS: tenta no final (cookies + tv invalida a sessão,
-  // então usa web_safari/mweb com cookies).
-  if (hasCookies) {
-    attempts.push({ name: 'web_safari + cookies', withCookies: true, client: 'web_safari' });
-    attempts.push({ name: 'mweb + cookies', withCookies: true, client: 'mweb' });
-    attempts.push({ name: 'padrao + cookies', withCookies: true, client: null });
-  }
 
   let lastError = null;
 
@@ -491,6 +494,70 @@ async function pipedVideoDetails(videoId) {
   return null;
 }
 
+// Metadados/busca via yt-dlp (usa os cookies autenticados). Funciona quando
+// yt-search, Piped e Invidious estão bloqueados — o caso típico em datacenter.
+function ytdlpJsonArgs(target, client = 'web_safari') {
+  return [target, ...buildBaseArgs(true, client), '--dump-json'];
+}
+
+function parseFirstJson(stdout) {
+  const line = String(stdout || '').trim().split('\n').filter(Boolean).pop();
+  if (!line) return null;
+  try {
+    return JSON.parse(line);
+  } catch (_) {
+    return null;
+  }
+}
+
+function ytdlpDuration(j) {
+  if (j?.duration_string) return j.duration_string;
+  if (j?.duration) {
+    const m = Math.floor(j.duration / 60);
+    const s = Math.floor(j.duration % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+  return '';
+}
+
+// Detalhes de vídeo (título/canal) direto do yt-dlp
+async function ytdlpVideoDetails(videoId) {
+  try {
+    const j = parseFirstJson(await runYtDlpExecFile(ytdlpJsonArgs(`https://www.youtube.com/watch?v=${videoId}`)));
+    if (!j?.title) return null;
+    return {
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+      videoId,
+      title: j.title,
+      duration: ytdlpDuration(j),
+      views: j.view_count || 0,
+      author: j.uploader || j.channel || 'YouTube',
+    };
+  } catch (err) {
+    console.warn(`⚠️ yt-dlp não resolveu metadados de ${videoId}: ${err.message?.slice(0, 100)}`);
+    return null;
+  }
+}
+
+// Busca por texto usando ytsearch1 do yt-dlp
+async function ytdlpSearch(query) {
+  try {
+    const j = parseFirstJson(await runYtDlpExecFile(ytdlpJsonArgs(`ytsearch1:${query}`)));
+    if (!j?.id) return null;
+    return {
+      url: j.webpage_url || `https://www.youtube.com/watch?v=${j.id}`,
+      videoId: j.id,
+      title: j.title || query,
+      duration: ytdlpDuration(j),
+      views: j.view_count || 0,
+      author: j.uploader || j.channel || 'YouTube',
+    };
+  } catch (err) {
+    console.warn(`⚠️ yt-dlp não conseguiu buscar "${query}": ${err.message?.slice(0, 100)}`);
+    return null;
+  }
+}
+
 // Extrai ID ou resolve URL / busca do YouTube (com fallbacks anti-bloqueio)
 async function resolveYoutubeInfo(query) {
   const cleanQuery = query.trim();
@@ -515,6 +582,8 @@ async function resolveYoutubeInfo(query) {
     }
     const piped = await pipedVideoDetails(videoId);
     if (piped) return piped;
+    const viaYtDlp = await ytdlpVideoDetails(videoId);
+    if (viaYtDlp) return viaYtDlp;
     return { url, videoId, title: 'Áudio do YouTube', duration: '', views: 0, author: 'YouTube' };
   }
 
@@ -545,6 +614,11 @@ async function resolveYoutubeInfo(query) {
   if (inv) {
     console.log(`[busca] ✅ Resolvido via Invidious: ${inv.title}`);
     return inv;
+  }
+  const viaYtDlp = await ytdlpSearch(cleanQuery);
+  if (viaYtDlp) {
+    console.log(`[busca] ✅ Resolvido via yt-dlp (cookies): ${viaYtDlp.title}`);
+    return viaYtDlp;
   }
   throw new Error('Nenhum vídeo encontrado para esta busca (YouTube bloqueou todas as fontes de pesquisa).');
 }
