@@ -8,11 +8,26 @@ import http from 'http';
 import { loadDatabase } from './src/database.js';
 import { initSqlite } from './src/database/sqlite.js';
 import { ensureDataDir, SESSION_DIR, IS_PERSISTENT, DATA_DIR } from './src/config/paths.js';
+import { criarCacheDeTentativas, instalarFiltroDeRuidoDeSessao, criarRegistradorDeFalhas } from './src/utils/sessionTools.js';
 import { handleMessages } from './src/messageHandler.js';
 import queueManager from './src/queue/QueueManager.js';
 
-// Cache global de tentativas de retry para evitar loops de mensagens não descriptografadas
-const msgRetryCounterCache = new Map();
+// Cache global de tentativas de retry para evitar loops de mensagens não descriptografadas.
+const msgRetryCounterCache = criarCacheDeTentativas();
+
+// Troca os stack traces de Bad MAC por um resumo periódico no log.
+instalarFiltroDeRuidoDeSessao();
+
+// Guarda as últimas mensagens por ID. O Baileys usa isso para reenviar/decifrar
+// retries e para ler o voto de enquetes. Antes devolvíamos um texto falso.
+const mensagensRecentes = new Map();
+function guardarMensagem(chave, mensagem) {
+  if (!chave?.id || !mensagem) return;
+  mensagensRecentes.set(chave.id, mensagem);
+  if (mensagensRecentes.size > 500) {
+    mensagensRecentes.delete(mensagensRecentes.keys().next().value);
+  }
+}
 
 // Marca o horário de início do bot
 global.botStartTime = Date.now();
@@ -69,12 +84,24 @@ async function startBot() {
     console.warn('⚠️ Não foi possível buscar a versão mais recente do WA Web, usando padrão interno do Baileys.', err);
   }
 
+  // Chaves Signal com cache (usadas no socket e no reset de sessão)
+  const keys = makeCacheableSignalKeyStore(state.keys, logger);
+
+  // Quando uma conversa falha várias vezes seguidas, descarta as chaves dela
+  // para o WhatsApp renegociar a sessão na próxima mensagem.
+  const registrarFalhaDeDescriptografia = criarRegistradorDeFalhas({
+    aoExceder: async (jid) => {
+      await keys.set({ session: { [jid]: null } });
+      console.warn(`♻️ [sessão] Chaves de ${jid} descartadas para renegociar a sessão.`);
+    }
+  });
+
   // Inicializa o socket do Baileys com cache de chaves Signal e tratamento de retries
   const rawSock = makeWASocket({
     version,
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger)
+      keys
     },
     logger,
     browser: ['Mac OS', 'Chrome', '10.15.7'], // Perfil de navegador compativel com WA Business
@@ -82,9 +109,7 @@ async function startBot() {
     syncFullHistory: false,
     generateHighQualityLinkPreview: true,
     msgRetryCounterCache,
-    getMessage: async (key) => {
-      return { conversation: 'Bot WhatsApp' };
-    }
+    getMessage: async (key) => mensagensRecentes.get(key.id)
   });
 
   const sock = queueManager.wrapSocket(rawSock);
@@ -149,6 +174,14 @@ async function startBot() {
   sock.ev.on('messages.upsert', async (m) => {
     if (m.type === 'notify' || m.type === 'append') {
       for (const msg of m.messages) {
+        guardarMensagem(msg.key, msg.message);
+
+        // Sem conteúdo = não foi possível descriptografar (Bad MAC).
+        if (!msg.message) {
+          registrarFalhaDeDescriptografia(msg.key);
+          continue;
+        }
+
         try {
           await handleMessages(sock, msg);
         } catch (err) {

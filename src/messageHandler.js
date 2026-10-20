@@ -100,6 +100,8 @@ export async function handleMessages(rawSock, msg) {
     const candidates = [
       rawFrom,
       msg.key?.participant,
+      msg.key?.senderPn,
+      msg.key?.participantPn,
       msg.key?.remoteJidAlt,
       msg.key?.participantAlt,
       msg.message?.extendedTextMessage?.contextInfo?.participant,
@@ -255,7 +257,8 @@ export async function handleMessages(rawSock, msg) {
   }
 
   if (!isGroup) {
-    console.log(`📩 [PV RECEBIDO] De: ${sender} | Texto: "${body}"`);
+    const origem = sender !== rawFrom ? `${sender} (${rawFrom})` : sender;
+    console.log(`📩 [PV RECEBIDO] De: ${origem} | Texto: "${body}"`);
   }
 
   // Permitir comandos populares no privado mesmo se digitados sem a barra "/"
