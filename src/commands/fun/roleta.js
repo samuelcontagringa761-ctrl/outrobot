@@ -1,3 +1,5 @@
+import { cabecalho } from '../../config/messages.js';
+
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function handleRoletaCommand(sock, msg, sender) {
@@ -8,7 +10,7 @@ export async function handleRoletaCommand(sock, msg, sender) {
 
   // 1. Mensagem Inicial
   await sock.sendMessage(from, { 
-    text: `🔫 *ROLETA RUSSA* 🔫\n\n${username} colocou uma bala no tambor e gira a câmara...`,
+    text: `${cabecalho('🔫', 'Roleta Russa')}\n\n${username} colocou uma bala no tambor e girou a câmara...`,
     mentions: [sender]
   }, { quoted: msg });
 
@@ -40,10 +42,14 @@ export async function handleRoletaCommand(sock, msg, sender) {
 
   // 5. Resultado Final
   if (isDead) {
-    const deadText = `💥 *BANG! BANG!* ☠️\n\nA câmara continha a bala!\n\n⚰️ ${username} não teve sorte e *MORREU* na roleta russa!`;
+    const deadText = `${cabecalho('💥', 'Bang!')}\n\n` +
+                     `A câmara continha a bala.\n\n` +
+                     `⚰️ ${username} não teve sorte e *MORREU* na roleta russa!`;
     return sock.sendMessage(from, { text: deadText, mentions: [sender] });
   }
 
-  const surviveText = `💨 *CLIQUE!* 😮‍💨\n\nA câmara estava vazia!\n\n🏆 ${username} deu sorte e *SOBREVIVEU* à roleta russa!`;
+  const surviveText = `${cabecalho('💨', 'Clique!')}\n\n` +
+                      `A câmara estava vazia.\n\n` +
+                      `🏆 ${username} deu sorte e *SOBREVIVEU* à roleta russa!`;
   return sock.sendMessage(from, { text: surviveText, mentions: [sender] });
 }

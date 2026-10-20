@@ -43,7 +43,8 @@ export class AIService {
       const response = await askAiChat(messages, { temperature: 0.75 });
 
       if (!response) {
-        return `${charInfo.nickname}: Tive um pequeno lapso aqui... O que você estava dizendo?`;
+        // Resposta de conversa: mantém o tom da personagem, sem prefixo de erro.
+        return '😅 Tive um pequeno lapso aqui... Pode repetir o que você disse?';
       }
 
       // 5. Limpa possíveis prefixos robóticos

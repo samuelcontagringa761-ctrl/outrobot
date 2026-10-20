@@ -1,3 +1,5 @@
+import { marcaAlguem, cabecalho, linha } from '../../config/messages.js';
+
 export async function handleShipCommand(sock, msg, args, sender, mentioned) {
   const from = msg.key.remoteJid;
   
@@ -12,7 +14,7 @@ export async function handleShipCommand(sock, msg, args, sender, mentioned) {
   }
 
   if (!target2 || target1 === target2) {
-    return sock.sendMessage(from, { text: '⚠️ Marque duas pessoas ou responda a alguém para calcular o ship!' }, { quoted: msg });
+    return sock.sendMessage(from, { text: marcaAlguem() }, { quoted: msg });
   }
 
   // Gera porcentagem baseada nos hashes dos dois JIDs para ser consistente no dia
@@ -30,14 +32,14 @@ export async function handleShipCommand(sock, msg, args, sender, mentioned) {
   if (percentage < 25) status = '💔 Pura ilusão... melhor serem só amigos!';
   else if (percentage < 50) status = '🤔 Pode dar certo com um pouco de esforço!';
   else if (percentage < 80) status = '💖 Que lindo casal! Tem grande potencial.';
-  else status = '🔥 CASAL PERFEITO! Casamento à vista! 💍';
+  else status = '🔥 Casal perfeito! Casamento à vista! 💍';
 
-  const text = `👩‍❤️‍👨 *MEDIDOR DE CASAL (SHIP)* 👨‍❤️‍👨\n\n` +
+  const text = `${cabecalho('💘', 'Medidor de Casal (Ship)')}\n\n` +
                `👤 @${target1.split('@')[0]}\n` +
                `👤 @${target2.split('@')[0]}\n\n` +
-               `📊 *Afinidade:* ${percentage}%\n` +
+               `${linha('Afinidade', `${percentage}%`)}\n` +
                `[${bar}]\n\n` +
-               `💬 *Veredito:* ${status}`;
+               `${linha('Veredito', status)}`;
 
   return sock.sendMessage(from, { text, mentions: [target1, target2] }, { quoted: msg });
 }

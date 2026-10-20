@@ -1,5 +1,6 @@
 import { getDatabase, updateDatabase } from '../database.js';
 import { generateMeterComment } from '../utils/meterComments.js';
+import { aviso, cabecalho, linha, marcaAlguem } from '../config/messages.js';
 
 // Função auxiliar para formatar tempo de casamento
 function formatDuration(ms) {
@@ -24,34 +25,34 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
   switch (command) {
     case 'casar': {
       if (!mentioned || mentioned.length === 0) {
-        return reply('⚠️ Você precisa marcar alguém para pedir em casamento! Exemplo: /casar @marcar');
+        return reply(marcaAlguem());
       }
       
       const target = mentioned[0];
       if (target === sender) {
-        return reply('⚠️ Você não pode se casar com você mesmo!');
+        return reply(aviso('Você não pode se casar com você mesmo.'));
       }
 
       if (db.casamentos[sender]) {
         const parceiro = db.casamentos[sender].parceiro;
-        return reply(`⚠️ Você já está casado(a) com @${parceiro.split('@')[0]}! Se divorcie primeiro.`, [parceiro]);
+        return reply(aviso(`Você já está casado(a) com @${parceiro.split('@')[0]}. Divorcie-se primeiro.`), [parceiro]);
       }
 
       if (db.casamentos[target]) {
-        return reply(`⚠️ Essa pessoa já está casada com @${db.casamentos[target].parceiro.split('@')[0]}!`, [db.casamentos[target].parceiro]);
+        return reply(aviso(`Essa pessoa já está casada com @${db.casamentos[target].parceiro.split('@')[0]}.`), [db.casamentos[target].parceiro]);
       }
 
       updateDatabase((d) => {
         d.pedidosCasamento[target] = sender;
       });
 
-      return reply(`💍 @${sender.split('@')[0]} pediu @${target.split('@')[0]} em casamento!\n\nUse /aceitar ou /recusar para responder ao pedido.`, [sender, target]);
+      return reply(`💍 @${sender.split('@')[0]} pediu @${target.split('@')[0]} em casamento!\n\nUse \`/aceitar\` ou \`/recusar\` para responder ao pedido.`, [sender, target]);
     }
 
     case 'aceitar': {
       const noivo = db.pedidosCasamento[sender];
       if (!noivo) {
-        return reply('⚠️ Você não tem nenhum pedido de casamento pendente.');
+        return reply(aviso('Você não tem nenhum pedido de casamento pendente.'));
       }
 
       // Validar se o noivo já não casou com outro no meio tempo
@@ -59,7 +60,7 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
         updateDatabase((d) => {
           delete d.pedidosCasamento[sender];
         });
-        return reply('⚠️ O pedido expirou pois a pessoa já se casou com outro.');
+        return reply(aviso('O pedido expirou, pois a pessoa já se casou com outra.'));
       }
 
       updateDatabase((d) => {
@@ -69,25 +70,25 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
         delete d.pedidosCasamento[noivo];
       });
 
-      return reply(`💍 Parabéns! @${sender.split('@')[0]} e @${noivo.split('@')[0]} agora estão casados! 🎉\nQue essa união seja repleta de felicidade!`, [sender, noivo]);
+      return reply(`💍 Parabéns! @${sender.split('@')[0]} e @${noivo.split('@')[0]} agora estão casados!\nQue essa união seja repleta de felicidade.`, [sender, noivo]);
     }
 
     case 'recusar': {
       const noivo = db.pedidosCasamento[sender];
       if (!noivo) {
-        return reply('⚠️ Você não tem nenhum pedido de casamento pendente.');
+        return reply(aviso('Você não tem nenhum pedido de casamento pendente.'));
       }
 
       updateDatabase((d) => {
         delete d.pedidosCasamento[sender];
       });
 
-      return reply(`💔 O pedido de casamento de @${noivo.split('@')[0]} foi recusado por @${sender.split('@')[0]}... Fica para a próxima!`, [noivo, sender]);
+      return reply(`💔 O pedido de casamento de @${noivo.split('@')[0]} foi recusado por @${sender.split('@')[0]}. Fica para a próxima!`, [noivo, sender]);
     }
 
     case 'divorcio': {
       if (!db.casamentos[sender]) {
-        return reply('⚠️ Você não está casado(a).');
+        return reply(aviso('Você não está casado(a).'));
       }
 
       const parceiro = db.casamentos[sender].parceiro;
@@ -97,7 +98,7 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
         delete d.casamentos[parceiro];
       });
 
-      return reply(`💔 Triste notícia! @${sender.split('@')[0]} e @${parceiro.split('@')[0]} se divorciaram... A vida segue.`, [sender, parceiro]);
+      return reply(`💔 Triste notícia! @${sender.split('@')[0]} e @${parceiro.split('@')[0]} se divorciaram. A vida segue.`, [sender, parceiro]);
     }
 
     case 'perfil': {
@@ -115,9 +116,9 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
         mencoes.push(parceiro);
       }
 
-      const strPerfil = `👤 *PERFIL DE USUÁRIO*\n\n` +
-                        `• *Usuário:* @${targetName}\n` +
-                        `• *Status:* ${status}`;
+      const strPerfil = `${cabecalho('👤', 'Perfil de usuário')}\n\n` +
+                        `${linha('Usuário', `@${targetName}`)}\n` +
+                        `${linha('Status', status)}`;
       
       mencoes.push(target);
       return reply(strPerfil, mencoes);
@@ -129,17 +130,17 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
       const pct = Math.floor(Math.random() * 101);
       const desc = await generateMeterComment('gay', pct, targetName);
 
-      return reply(`🏳️‍🌈 *TESTE GAY*\n\n• @${targetName} é *${pct}%* gay!\n\n${desc}`, [target]);
+      return reply(`${cabecalho('🏳️‍🌈', 'Teste gay')}\n\n• @${targetName} é *${pct}%* gay!\n\n${desc}`, [target]);
     }
 
     case 'romance': {
       if (!mentioned || mentioned.length === 0) {
-        return reply('⚠️ Você precisa marcar alguém para calcular o romance! Exemplo: /romance @marcar');
+        return reply(marcaAlguem());
       }
 
       const target = mentioned[0];
       if (target === sender) {
-        return reply('⚠️ Você não pode calcular romance com você mesmo!');
+        return reply(aviso('Você não pode calcular romance com você mesmo.'));
       }
 
       const senderName = sender.split('@')[0];
@@ -148,10 +149,10 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
       const pct = combined % 101;
       const msgRomance = await generateMeterComment('romance', pct, senderName, targetName);
 
-      return reply(`💖 *TESTE DE COMPATIBILIDADE* 💖\n\n` +
+      return reply(`${cabecalho('💖', 'Teste de compatibilidade')}\n\n` +
                    `• @${senderName}\n` +
                    `• @${targetName}\n\n` +
-                   `Compatibilidade: *${pct}%*\n\n${msgRomance}`, [sender, target]);
+                   `${linha('Compatibilidade', pct + '%')}\n\n${msgRomance}`, [sender, target]);
     }
 
     case 'corno': {
@@ -160,7 +161,7 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
       const pct = Math.floor(Math.random() * 101);
       const desc = await generateMeterComment('corno', pct, targetName);
 
-      return reply(`🐂 *TESTE DE CORNO*\n\n• @${targetName} é *${pct}%* corno(a)!\n\n${desc}`, [target]);
+      return reply(`${cabecalho('🐂', 'Teste de corno')}\n\n• @${targetName} é *${pct}%* corno(a)!\n\n${desc}`, [target]);
     }
 
     case 'feio': {
@@ -169,7 +170,7 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
       const pct = Math.floor(Math.random() * 101);
       const desc = await generateMeterComment('feio', pct, targetName);
 
-      return reply(`👹 *MEDIDOR DE FEIURA*\n\n• @${targetName} é *${pct}%* feio(a)!\n\n${desc}`, [target]);
+      return reply(`${cabecalho('👹', 'Medidor de feiura')}\n\n• @${targetName} é *${pct}%* feio(a)!\n\n${desc}`, [target]);
     }
 
     case 'gostoso': {
@@ -178,7 +179,7 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
       const pct = Math.floor(Math.random() * 101);
       const desc = await generateMeterComment('gostoso', pct, targetName);
 
-      return reply(`🔥 *MEDIDOR DE GOSTOSURA*\n\n• @${targetName} é *${pct}%* gostoso(a)!\n\n${desc}`, [target]);
+      return reply(`${cabecalho('🔥', 'Medidor de gostosura')}\n\n• @${targetName} é *${pct}%* gostoso(a)!\n\n${desc}`, [target]);
     }
 
     case 'bebado': {
@@ -187,7 +188,7 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
       const pct = Math.floor(Math.random() * 101);
       const desc = await generateMeterComment('bebado', pct, targetName);
 
-      return reply(`🍺 *MEDIDOR DE EMBRIAGUEZ*\n\n• @${targetName} está *${pct}%* bêbado(a)!\n\n${desc}`, [target]);
+      return reply(`${cabecalho('🍺', 'Medidor de embriaguez')}\n\n• @${targetName} está *${pct}%* bêbado(a)!\n\n${desc}`, [target]);
     }
 
     case 'chato': {
@@ -196,7 +197,7 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
       const pct = Math.floor(Math.random() * 101);
       const desc = await generateMeterComment('chato', pct, targetName);
 
-      return reply(`🙄 *MEDIDOR DE CHATICE*\n\n• @${targetName} é *${pct}%* chato(a)!\n\n${desc}`, [target]);
+      return reply(`${cabecalho('🙄', 'Medidor de chatice')}\n\n• @${targetName} é *${pct}%* chato(a)!\n\n${desc}`, [target]);
     }
 
     case 'sortudo': {
@@ -205,59 +206,59 @@ export async function handleSocialCommands(sock, msg, command, args, sender, men
       const pct = Math.floor(Math.random() * 101);
       const desc = await generateMeterComment('sortudo', pct, targetName);
 
-      return reply(`🍀 *MEDIDOR DE SORTE*\n\n• @${targetName} é *${pct}%* sortudo(a)!\n\n${desc}`, [target]);
+      return reply(`${cabecalho('🍀', 'Medidor de sorte')}\n\n• @${targetName} é *${pct}%* sortudo(a)!\n\n${desc}`, [target]);
     }
 
     case 'beijo': {
       if (!mentioned || mentioned.length === 0) {
-        return reply('⚠️ Você precisa marcar alguém para beijar! Exemplo: /beijo @marcar');
+        return reply(marcaAlguem());
       }
 
       const target = mentioned[0];
       if (target === sender) {
-        return reply('⚠️ Você tentou se beijar no espelho! 🪞💋');
+        return reply(aviso('Você tentou se beijar no espelho!'));
       }
 
-      return reply(`💋 @${sender.split('@')[0]} deu um beijo super carinhoso em @${target.split('@')[0]}! 😘❤️`, [sender, target]);
+      return reply(`💋 @${sender.split('@')[0]} deu um beijo super carinhoso em @${target.split('@')[0]}!`, [sender, target]);
     }
 
     case 'tapa': {
       if (!mentioned || mentioned.length === 0) {
-        return reply('⚠️ Você precisa marcar alguém para dar um tapa! Exemplo: /tapa @marcar');
+        return reply(marcaAlguem());
       }
 
       const target = mentioned[0];
       if (target === sender) {
-        return reply('⚠️ Você deu um tapa na própria cara! Por que fez isso?! 🤦‍♂️');
+        return reply(aviso('Você deu um tapa na própria cara! Por que fez isso?'));
       }
 
-      return reply(`🖐️💥 @${sender.split('@')[0]} deu um puta tapa estalado na cara de @${target.split('@')[0]}! 😱`, [sender, target]);
+      return reply(`🖐️ @${sender.split('@')[0]} deu um puta tapa estalado na cara de @${target.split('@')[0]}!`, [sender, target]);
     }
 
     case 'mamada': {
       if (!mentioned || mentioned.length === 0) {
-        return reply('⚠️ Você precisa marcar alguém! Exemplo: /mamada @marcar');
+        return reply(marcaAlguem());
       }
 
       const target = mentioned[0];
       if (target === sender) {
-        return reply('⚠️ Aí não né... contorcionismo?! 😳');
+        return reply(aviso('Aí não, né? Contorcionismo!'));
       }
 
-      return reply(`🥛😳 @${sender.split('@')[0]} deu uma mamada caprichada em @${target.split('@')[0]}! Que isso papai! 🔥`, [sender, target]);
+      return reply(`🥛 @${sender.split('@')[0]} deu uma mamada caprichada em @${target.split('@')[0]}! Que isso, papai!`, [sender, target]);
     }
 
     case 'gozar': {
       if (!mentioned || mentioned.length === 0) {
-        return reply(`💦🤪 @${sender.split('@')[0]} não aguentou a emoção e gozou de felicidade! 🫣`, [sender]);
+        return reply(`💦 @${sender.split('@')[0]} não aguentou a emoção e gozou de felicidade!`, [sender]);
       }
 
       const target = mentioned[0];
       if (target === sender) {
-        return reply(`💦🤪 @${sender.split('@')[0]} gozou sozinho(a) de tanta emoção! 🫣`, [sender]);
+        return reply(`💦 @${sender.split('@')[0]} gozou sozinho(a) de tanta emoção!`, [sender]);
       }
 
-      return reply(`💦🤪 @${sender.split('@')[0]} gozou de tanta emoção em cima de @${target.split('@')[0]}! 🫣`, [sender, target]);
+      return reply(`💦 @${sender.split('@')[0]} gozou de tanta emoção em cima de @${target.split('@')[0]}!`, [sender, target]);
     }
 
     default:

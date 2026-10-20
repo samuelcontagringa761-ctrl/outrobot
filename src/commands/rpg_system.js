@@ -2,6 +2,7 @@ import { getUser, updateUser } from '../database/sqlite.js';
 import { askAi } from '../utils/aiService.js';
 import { calculateBonusRewards, getUserStats, checkAndApplyLevelUp } from '../utils/bonusCalculator.js';
 import { getActiveUserMission, createMissionForUser, claimMissionRewardAtomic } from '../database/MissionRepository.js';
+import { aviso, cabecalho, linha } from '../config/messages.js';
 
 export const RPG_CLASSES = {
   guerreiro: { name: '⚔️ Guerreiro de Aço', hp: 200, atk: 35, bonusMsg: 'Mais força (+25% moedas em combate, roubo, raid e missões)!' },
@@ -53,21 +54,21 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
         extraData.current_hp = userStats.maxHp;
         extraData.last_heal_time = now;
         updateUser(sender, { inventory: JSON.stringify(inventory), extra_data: JSON.stringify(extraData) });
-        return reply(`🧪 *POÇÃO DE CURA USADA!*\n\nSeu HP foi totalmente restaurado para **${userStats.maxHp}/${userStats.maxHp} HP**! ❤️`);
+        return reply(`${cabecalho('🧪', 'Poção de cura usada!')}\n\nSeu HP foi totalmente restaurado para *${userStats.maxHp}/${userStats.maxHp} HP*!`);
       }
 
       if (now - lastHeal < HEAL_COOLDOWN && userStats.isKnockedOut) {
         const remaining = HEAL_COOLDOWN - (now - lastHeal);
         const minutes = Math.floor(remaining / (1000 * 60));
         const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-        return reply(`⏳ *DESCANSO EM ANDAMENTO!*\n\nVocê está nocauteado. Aguarde **${minutes}m ${seconds}s** de descanso ou compre uma \`Poção de HP\` na \`/loja\`!`);
+        return reply(`⏳ *DESCANSO EM ANDAMENTO!*\n\nVocê está nocauteado. Aguarde *${minutes}m ${seconds}s* de descanso ou compre uma \`Poção de HP\` na \`/loja\`!`);
       }
 
       extraData.current_hp = userStats.maxHp;
       extraData.last_heal_time = now;
       updateUser(sender, { extra_data: JSON.stringify(extraData) });
 
-      return reply(`🩺 *REGENERAÇÃO CONCLUÍDA!*\n\nVocê descansou e recuperou seu vigor! ❤️ **HP:** ${userStats.maxHp}/${userStats.maxHp}`);
+      return reply(`${cabecalho('🩺', 'Regeneração concluída!')}\n\nVocê descansou e recuperou seu vigor!\nHP: *${userStats.maxHp}/${userStats.maxHp}*`);
     }
 
     case 'guerreiro':
@@ -77,7 +78,7 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
       let chosenClass = command === 'classe' ? args[0]?.toLowerCase() : command;
       if (!chosenClass || !RPG_CLASSES[chosenClass]) {
         let catalog = Object.keys(RPG_CLASSES).map(c => `• *${RPG_CLASSES[c].name}*\n  ⚔️ Ataque: ${userStats.classInfo.atk} | ❤️ Vida: ${userStats.classInfo.hp}\n  ✨ Tier Atual: ${userStats.classInfo.name}\n  👉 Escolha com: \`/classe ${c}\``).join('\n\n');
-        return reply(`🛡️ *SISTEMA DE CLASSES RPG* 🛡️\n\nClasse atual: *${userStats.classInfo.name}* (Nível ${user.level})\n\nEscolha sua classe:\n\n${catalog}`);
+        return reply(`${cabecalho('🛡️', 'Sistema de Classes RPG')}\n\nClasse atual: *${userStats.classInfo.name}* (Nível ${user.level})\n\nEscolha sua classe:\n\n${catalog}`);
       }
 
       extraData.rpg_class = chosenClass;
@@ -85,13 +86,13 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
 
       const newStats = getUserStats(getUser(sender));
 
-      return reply(`🛡️ *CLASSE DEFINIDA COM SUCESSO!*\n\nVocê agora é um **${newStats.classInfo.name}**!\n⚔️ *Ataque Base:* ${newStats.classInfo.atk}\n❤️ *HP Máximo:* ${newStats.maxHp}\n✨ *Benefício:* Seus bônus de classe evoluem conforme seu Nível RPG!`);
+      return reply(`${cabecalho('🛡️', 'Classe definida com sucesso!')}\n\nVocê agora é um *${newStats.classInfo.name}*!\n⚔️ *Ataque Base:* ${newStats.classInfo.atk}\n❤️ *HP Máximo:* ${newStats.maxHp}\n✨ *Benefício:* Seus bônus de classe evoluem conforme seu Nível RPG!`);
     }
 
     case 'missao':
     case 'missoes': {
       if (userStats.isKnockedOut) {
-        return reply(`💀 *VOCÊ ESTÁ NOCAUTEADO (K.O.)!*\n\nSeu HP é 0/${userStats.maxHp}. Use \`/curar\` para descansar ou tome uma \`Poção de HP\` da loja antes de ir a uma missão!`);
+        return reply(`${cabecalho('💀', 'Você está nocauteado (K.O.)!')}\n\nSeu HP é 0/${userStats.maxHp}. Use \`/curar\` para descansar ou tome uma \`Poção de HP\` da loja antes de ir a uma missão!`);
       }
 
       const active = getActiveUserMission(sender);
@@ -104,11 +105,11 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
           const minutes = Math.floor((totalSec % 3600) / 60);
           const seconds = totalSec % 60;
           const timeStr = hours > 0 ? `${hours}h ${minutes}m ${seconds}s` : (minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`);
-          return reply(`⏳ *GUILDA EM DESCANSO!* 🏰\n\nNenhuma missão disponível no momento na categoria **${result.difficultyName}**.\n⏱️ *Tempo para a próxima missão:* *${timeStr}*`);
+          return reply(`⏳ *GUILDA EM DESCANSO!*\n\nNenhuma missão disponível no momento na categoria *${result.difficultyName}*.\n${linha('Tempo para a próxima missão', timeStr)}`);
         }
 
         const m = result.mission;
-        const text = `⚔️ *NOVA MISSÃO DA GUILDA DESIGNADA!* ⚔️\n\n` +
+        const text = `${cabecalho('⚔️', 'Nova missão da guilda designada!')}\n\n` +
                      `📜 *Missão:* ${m.title}\n` +
                      `⭐ *Dificuldade:* ${m.difficulty_name}\n` +
                      `💰 *Recompensa Estimada:* $${m.reward_money.toLocaleString('pt-BR')} moedas\n` +
@@ -121,7 +122,7 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
       // Se já possui missão ativa, conclui atómicamente no banco
       const claim = await claimMissionRewardAtomic(sender);
       if (!claim.success) {
-        return reply('⚠️ Esta missão já foi concluída ou resgatada!');
+        return reply(aviso('Esta missão já foi concluída ou resgatada.'));
       }
 
       const m = claim.mission;
@@ -132,7 +133,7 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
       const bonusCoinsStr = claim.bonusCoinsApplied > 0 ? ` *(+$${claim.bonusCoinsApplied.toLocaleString('pt-BR')} bônus)*` : '';
       const bonusXpStr = claim.bonusXpApplied > 0 ? ` *(+${claim.bonusXpApplied} XP bônus)*` : '';
 
-      const text = `⚔️ *MISSÃO CUMPRIDA PELA GUILDA!* ⚔️\n\n` +
+      const text = `${cabecalho('⚔️', 'Missão cumprida pela guilda!')}\n\n` +
                    `📜 *Missão:* ${m.title}\n` +
                    `⭐ *Dificuldade:* ${m.difficulty_name}\n` +
                    `💰 *Recompensa Final:* +$${claim.finalCoins.toLocaleString('pt-BR')} moedas${bonusCoinsStr}\n` +
@@ -149,7 +150,7 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
       const TURN_COOLDOWN = 30 * 1000; // 30 segundos entre golpes na mesma Raid
 
       if (userStats.isKnockedOut) {
-        return reply(`💀 *VOCÊ ESTÁ NOCAUTEADO (0/${userStats.maxHp} HP)!*\n\nVocê não pode atacar o chefe da Raid desacordado! Use \`/curar\` para recuperar suas forças.`);
+        return reply(`${cabecalho('💀', `Você está nocauteado (0/${userStats.maxHp} HP)!`)}\n\nVocê não pode atacar o chefe da Raid desacordado! Use \`/curar\` para recuperar suas forças.`);
       }
 
       let raid = activeGroupRaids.get(from);
@@ -161,7 +162,7 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
           const remaining = RAID_SESSION_COOLDOWN - (now - lastGroupRaid);
           const hours = Math.floor(remaining / (1000 * 60 * 60));
           const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-          return reply(`⏳ *PRÓXIMA RAID EM PREPARAÇÃO!* 🏰\n\nA guilda está mapeando a localização do próximo monstro supremo para o grupo.\n⏱️ *Tempo para a próxima Raid inteira do grupo:* *${hours}h ${minutes}m*`);
+          return reply(`⏳ *PRÓXIMA RAID EM PREPARAÇÃO!*\n\nA guilda está mapeando a localização do próximo monstro supremo para o grupo.\n${linha('Tempo para a próxima Raid inteira do grupo', `${hours}h ${minutes}m`)}`);
         }
 
         // Criar uma nova Raid inteira de grupo!
@@ -202,7 +203,7 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
       // Habilidade da Fênix Imortal (Auto-reviver 1x)
       if (newPlayerHp <= 0 && userStats.petInfo && userStats.petInfo.id === 'fenix') {
         newPlayerHp = userStats.maxHp;
-        reviveText = '\n🦅 *SUA FÊNIX IMORTAL RENASCEU VOCÊ DAS CINZAS!* (HP 100% restaurado!)';
+        reviveText = '\n🦅 *SUA FÊNIX IMORTAL RENASCEU DAS CINZAS!* (HP restaurado para 100%!)';
       }
 
       extraData.current_hp = newPlayerHp;
@@ -236,11 +237,11 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
         const prompt = `O chefe ${raid.boss.name} foi derrotado pela união do grupo de aventureiros!`;
         const aiStory = await getAiNarrative(prompt, sys) || 'Com um rugido estrondoso, o monstro lendário caiu derrotado!';
 
-        const text = `🏆 *RAID CONCLUÍDA — CHEFE DERROTADO!* 🏆\n\n` +
+        const text = `${cabecalho('🏆', 'Raid concluída — chefe derrotado!')}\n\n` +
                      `👾 *Monstro Lendário:* ${raid.boss.name}\n\n` +
                      `📜 *Crônica da Batalha (IA):*\n_"${aiStory}"_\n\n` +
                      `💰 *DIVISÃO DO TESOURO DA RAID:*\n${rewardReport}\n` +
-                     `⏱️ *Próxima Raid do grupo disponível em:* 12 horas!`;
+                     `${linha('Próxima Raid do grupo disponível em', '12 horas')}`;
 
         return reply(text, mentions);
       }
@@ -251,7 +252,7 @@ export async function handleRpgSystemCommands(sock, msg, command, args, sender) 
 
       const koStatusText = newPlayerHp <= 0 ? '💀 *VOCÊ FOI NOCAUTEADO (K.O.)!* Use `/curar`' : `❤️ *Seu HP:* ${newPlayerHp}/${userStats.maxHp}`;
 
-      const text = `⚔️ *BATALHA DE RAID EM GRUPO (SESSÃO ATIVA)* ⚔️\n\n` +
+      const text = `${cabecalho('⚔️', 'Batalha de Raid em grupo (sessão ativa)')}\n\n` +
                    `👾 *Chefe:* ${raid.boss.name}\n` +
                    `❤️ *Vida Restante:* ${Math.max(0, raid.boss.hp)}/${raid.boss.maxHp} HP\n\n` +
                    `💥 *Seu Golpe:* +${dmg} de Dano!\n` +

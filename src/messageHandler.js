@@ -9,6 +9,8 @@ import { getDatabase } from './database.js';
 import { getUser, updateUser, getGroupConfig } from './database/sqlite.js';
 import { formatUptime } from './utils/helpers.js';
 import { calculateBonusRewards } from './utils/bonusCalculator.js';
+import { buildMenu } from './config/menu.js';
+import { erroInterno } from './config/messages.js';
 import dotenv from 'dotenv';
 
 // Importação dos Módulos de Comandos Ativos
@@ -372,153 +374,58 @@ export async function handleMessages(rawSock, msg) {
       if (hour >= 5 && hour < 12) greeting = '🌅 Bom dia';
       else if (hour >= 12 && hour < 18) greeting = '☀️ Boa tarde';
 
-      const menuText = 
-`╭───「 *SERIE BOT* ⚡ 」───
-│ 
-│ ${greeting}, *@${userNumber}*!
-│
-│ 👑 *Prefixo:* [ ${prefix} ]
-│ ⚡ *Velocidade:* ${velocityStr}s
-│ 🕒 *Uptime:* ${uptimeStr}
-│ 🧠 *IA:* Qwen 3.8 27B (Groq)
-│
-╰─────────────────────
+      const menuText = buildMenu({
+        prefixo: prefix,
+        usuario: userNumber,
+        saudacao: greeting,
+        velocidade: velocityStr,
+        uptime: uptimeStr,
+      });
 
-╭───「 📥 *MÍDIA & DOWNLOADS* 」
-│ ◈ ${prefix}play <nome/link> — Baixar música
-│ ◈ ${prefix}video <nome/link> — Baixar vídeo
-│ ◈ ${prefix}ig <link> — Baixar Reels / Instagram
-│ ◈ ${prefix}tiktok <link> — Baixar TikTok sem marca
-│ ◈ ${prefix}sticker — Criar figurinha de imagem/vídeo
-│ ◈ ${prefix}sticker2 — Figurinha com proporção original (sem distorcer)
-│ ◈ ${prefix}sticker3 — Figurinha preenchida, maior e sem bordas
-│ ◈ ${prefix}unsticker — Converter figurinha em imagem
-│ ◈ ${prefix}ver — Revelar mídia de visualização única
-╰─────────────────────
+      const assetsDir = path.resolve('assets');
+      let videoFiles = [];
 
-╭───「 🔎 *INTELIGÊNCIA ARTIFICIAL* 」
-│ ◈ ${prefix}ia <pergunta> — Pesquisar na internet e responder com fontes
-╰─────────────────────
+      if (fs.existsSync(assetsDir)) {
+        const filesInAssets = fs.readdirSync(assetsDir)
+          .filter(file => /\.(mp4|gif|webm)$/i.test(file))
+          .map(file => path.join(assetsDir, file));
+        videoFiles.push(...filesInAssets);
+      }
 
-╭───「 ⚔️ *SISTEMA RPG & BATALHAS* 」
-│ ◈ ${prefix}classe <guerreiro|mago|arqueiro> — Escolher classe
-│ ◈ ${prefix}missao — Ver ou iniciar missões diárias
-│ ◈ ${prefix}raid — Participar da Raid contra o Chefe
-│ ◈ ${prefix}curar — Restaurar vida com poção ou descanso
-│ ◈ ${prefix}perfil — Ver status de batalha, nível e moedas
-╰─────────────────────
+      const rootDir = path.resolve('.');
+      const filesInRoot = fs.readdirSync(rootDir)
+        .filter(file => /\.(mp4|gif|webm)$/i.test(file) && (file.startsWith('WhatsApp Video') || file.startsWith('menu')))
+        .map(file => path.join(rootDir, file));
+      videoFiles.push(...filesInRoot);
 
-╭───「 🎰 *CASSINO & MINIGAMES* 」
-│ ◈ ${prefix}blackjack <aposta> — Jogo 21 contra a banca
-│ ◈ ${prefix}poker <aposta> — Partida rápida de Poker
-│ ◈ ${prefix}slots <aposta> — Caça-níqueis animado
-│ ◈ ${prefix}pescar — Pescar peixes e itens raros
-╰─────────────────────
+      videoFiles = [...new Set(videoFiles)];
 
-╭───「 💍 *CASAMENTO & SOCIAL* 」
-│ ◈ ${prefix}casar @user — Fazer pedido de casamento
-│ ◈ ${prefix}aceitar — Aceitar pedido pendente
-│ ◈ ${prefix}recusar — Recusar pedido de casamento
-│ ◈ ${prefix}divorcio — Finalizar relacionamento
-│ ◈ ${prefix}perfil — Ver informações e cônjuge
-│ ◈ ${prefix}rep @user — Dar ponto de reputação (+1)
-│ ◈ ${prefix}beijo @user — Enviar um beijo animado
-│ ◈ ${prefix}tapa @user — Dar um tapa em alguém
-│ ◈ ${prefix}mamada @user — Brincadeira interativa
-│ ◈ ${prefix}gozar — Expressar pura emoção
-╰─────────────────────
-
-╭───「 🎮 *DIVERSÃO & JOGOS* 」
-│ ◈ ${prefix}ship @user1 @user2 — Calcular afinidade de casal
-│ ◈ ${prefix}8ball <pergunta> — Bola 8 mística com IA
-│ ◈ ${prefix}taro — Tiragem de cartas de Tarô com IA
-│ ◈ ${prefix}quiz — Pergunta de conhecimentos gerais
-│ ◈ ${prefix}forca — Desafio do jogo da forca
-│ ◈ ${prefix}roleta — Roleta russa em grupo
-│ ◈ ${prefix}ppt <pedra|papel|tesoura> — Jogo clássico
-│ ◈ ${prefix}dado — Rolar dado de 6 lados
-│ ◈ ${prefix}caraoucoroa <cara|coroa> — Teste sua sorte
-│ ◈ ${prefix}gay / ${prefix}corno / ${prefix}feio — Medidores zueira
-│ ◈ ${prefix}gostoso / ${prefix}bebado / ${prefix}sortudo
-╰─────────────────────
-
-╭───「 🛡️ *ADMINISTRAÇÃO DO GRUPO* 」
-│ ◈ ${prefix}ban @user — Banir membro do grupo
-│ ◈ ${prefix}kick @user — Remover membro do grupo
-│ ◈ ${prefix}promote @user — Promover a administrador
-│ ◈ ${prefix}demote @user — Rebaixar administrador
-│ ◈ ${prefix}tagall <aviso> — Marcar todos os membros
-│ ◈ ${prefix}mute / ${prefix}unmute — Fechar/abrir grupo
-│ ◈ ${prefix}antilink <on|off> — Filtro anti-links
-│ ◈ ${prefix}antispam <on|off> — Bloqueador de spam
-│ ◈ ${prefix}boasvindas <on|off> — Mensagem de boas-vindas
-│ ◈ ${prefix}regras — Visualizar ou definir regras
-│ ◈ ${prefix}warn @user — Aplicar advertência
-│ ◈ ${prefix}warnings @user — Consultar advertências
-│ ◈ ${prefix}enquete <título|op1|op2> — Criar enquete votável
-│ ◈ ${prefix}ticket — Abrir chamado de suporte
-│ ◈ ${prefix}antidel <on|off> — Anti-delete de mensagens (dono)
-│ ◈ ${prefix}adm @user — Autorizar uso do /ver (dono)
-╰─────────────────────
-
-╭───「 ⚙️ *UTILIDADES & INFORMAÇÕES* 」
-│ ◈ ${prefix}qrcode <texto> — Gerar imagem de QR Code
-│ ◈ ${prefix}readqr — Ler QR Code de imagem enviada
-│ ◈ ${prefix}cep <número> — Buscar endereço por CEP
-│ ◈ ${prefix}fila — Status da fila de processamento
-│ ◈ ${prefix}ping — Tempo de resposta e latência
-│ ◈ ${prefix}uptime — Tempo que o bot está ligado
-│ ◈ ${prefix}info / ${prefix}botinfo — Informações técnicas
-│ ◈ ${prefix}grupo — Detalhes do grupo atual
-╰─────────────────────
-
-💡 *Dica:* Digite o comando sem argumentos para ver exemplos de uso!
-✨ _Desenvolvido para máxima velocidade e diversão._`;
-
-        const assetsDir = path.resolve('assets');
-        let videoFiles = [];
-
-        if (fs.existsSync(assetsDir)) {
-          const filesInAssets = fs.readdirSync(assetsDir)
-            .filter(file => /\.(mp4|gif|webm)$/i.test(file))
-            .map(file => path.join(assetsDir, file));
-          videoFiles.push(...filesInAssets);
-        }
-
-        const rootDir = path.resolve('.');
-        const filesInRoot = fs.readdirSync(rootDir)
-          .filter(file => /\.(mp4|gif|webm)$/i.test(file) && (file.startsWith('WhatsApp Video') || file.startsWith('menu')))
-          .map(file => path.join(rootDir, file));
-        videoFiles.push(...filesInRoot);
-
-        videoFiles = [...new Set(videoFiles)];
-
-        if (videoFiles.length > 0) {
-          const randomVideoPath = videoFiles[Math.floor(Math.random() * videoFiles.length)];
-          try {
-            return await sock.sendMessage(from, {
-              video: fs.readFileSync(randomVideoPath),
-              caption: menuText,
-              mentions: [sender],
-              gifPlayback: true,
-              mimetype: 'video/mp4'
-            }, { quoted: msg });
-          } catch (vidErr) {
-            console.warn('⚠️ Falha ao enviar vídeo no menu, enviando como texto:', vidErr.message);
-            try {
-              return await sock.sendMessage(from, { text: menuText, mentions: [sender] }, { quoted: msg });
-            } catch (_) {
-              return await sock.sendMessage(from, { text: menuText, mentions: [sender] });
-            }
-          }
-        } else {
+      if (videoFiles.length > 0) {
+        const randomVideoPath = videoFiles[Math.floor(Math.random() * videoFiles.length)];
+        try {
+          return await sock.sendMessage(from, {
+            video: fs.readFileSync(randomVideoPath),
+            caption: menuText,
+            mentions: [sender],
+            gifPlayback: true,
+            mimetype: 'video/mp4'
+          }, { quoted: msg });
+        } catch (vidErr) {
+          console.warn('⚠️ Falha ao enviar vídeo no menu, enviando como texto:', vidErr.message);
           try {
             return await sock.sendMessage(from, { text: menuText, mentions: [sender] }, { quoted: msg });
           } catch (_) {
             return await sock.sendMessage(from, { text: menuText, mentions: [sender] });
           }
         }
-    }    else if (command === 'ia') {
+      } else {
+        try {
+          return await sock.sendMessage(from, { text: menuText, mentions: [sender] }, { quoted: msg });
+        } catch (_) {
+          return await sock.sendMessage(from, { text: menuText, mentions: [sender] });
+        }
+      }
+    } else if (command === 'ia') {
       await handleIaCommand(sock, msg, args);
     }
 
@@ -585,9 +492,9 @@ export async function handleMessages(rawSock, msg) {
   } catch (error) {
     console.error(`Erro ao executar o comando /${command}:`, error);
     try {
-      await sock.sendMessage(from, { text: `⚠️ Ocorreu um erro interno ao processar o comando /${command}.` }, { quoted: msg });
+      await sock.sendMessage(from, { text: erroInterno(command) }, { quoted: msg });
     } catch (_) {
-      await sock.sendMessage(from, { text: `⚠️ Ocorreu um erro interno ao processar o comando /${command}.` }).catch(() => {});
+      await sock.sendMessage(from, { text: erroInterno(command) }).catch(() => {});
     }
   }
 }

@@ -2,6 +2,7 @@ import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { getDatabase } from '../database.js';
 import { downloadWhatsAppMedia, downloadYoutubeAudio, downloadYoutubeVideo, downloadTiktokVideo, downloadTiktokAudio, downloadInstagramVideo, downloadInstagramAudio } from '../utils/helpers.js';
 import { checkIfOwner } from './admin.js';
+import { aviso, erro, uso } from '../config/messages.js';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 import fs from 'fs';
@@ -275,7 +276,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       } else if (msg.message?.videoMessage) {
         const duration = msg.message.videoMessage.seconds;
         if (duration > 15) {
-          return reply('⚠️ O vídeo deve ter no máximo 15 segundos para virar figurinha animada.');
+          return reply(aviso('O vídeo deve ter no máximo 15 segundos para virar figurinha animada.'));
         }
         mediaMessage = msg;
         mediaType = 'video';
@@ -285,7 +286,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         if (quoted) {
           // 🔒 Visualização única não vira figurinha (só o /ver restrito revela)
           if (isViewOnceQuoted(quoted)) {
-            return reply('🔒 Mídia de visualização única não pode virar figurinha. Ela só pode ser revelada com /ver (restrito).');
+            return reply(aviso('Mídia de visualização única não pode virar figurinha. Ela só pode ser revelada com o comando /ver, que é restrito.'));
           }
           if (quoted.imageMessage) {
             mediaMessage = {
@@ -300,7 +301,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
           } else if (quoted.videoMessage) {
             const duration = quoted.videoMessage.seconds;
             if (duration > 15) {
-              return reply('⚠️ O vídeo deve ter no máximo 15 segundos para virar figurinha animada.');
+              return reply(aviso('O vídeo deve ter no máximo 15 segundos para virar figurinha animada.'));
             }
             mediaMessage = {
               key: {
@@ -316,7 +317,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       }
 
       if (!mediaMessage) {
-        return reply('⚠️ Envie uma imagem/vídeo com o comando /sticker na legenda, ou responda a uma imagem/vídeo com o comando.');
+        return reply(aviso('Envie uma imagem ou um vídeo com o comando /sticker na legenda, ou responda a uma mídia com o comando.'));
       }
 
       await reply('⏳ Criando sua figurinha, aguarde...');
@@ -345,7 +346,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         await sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
       } catch (error) {
         console.error('Erro ao criar sticker:', error);
-        return reply('⚠️ Não foi possível criar a figurinha. Certifique-se de que a imagem ou vídeo é válido.');
+        return reply(erro('Não consegui criar a figurinha. Verifique se a imagem ou o vídeo é válido.'));
       }
       break;
     }
@@ -358,13 +359,13 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       const res = extractStickerImage(msg);
 
       if (res.error === 'VIEWONCE') {
-        return reply('🔒 Mídia de visualização única não pode virar figurinha. Ela só pode ser revelada com /ver (restrito).');
+        return reply(aviso('Mídia de visualização única não pode virar figurinha. Ela só pode ser revelada com o comando /ver, que é restrito.'));
       }
       if (res.error === 'VIDEO') {
-        return reply('⚠️ O comando /' + command + ' funciona apenas com imagens. Para vídeos curtos use /sticker.');
+        return reply(aviso(`O comando /${command} funciona apenas com imagens. Para vídeos curtos, use /sticker.`));
       }
       if (res.error || !res.mediaMessage) {
-        return reply('⚠️ Envie uma imagem com o comando /' + command + ' na legenda, ou responda a uma imagem com o comando.');
+        return reply(aviso(`Envie uma imagem com o comando /${command} na legenda, ou responda a uma imagem com o comando.`));
       }
 
       await reply('⏳ Criando sua figurinha, aguarde...');
@@ -378,7 +379,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         await sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
       } catch (error) {
         console.error(`Erro ao criar ${command}:`, error);
-        return reply('⚠️ Não foi possível criar a figurinha. Certifique-se de que a imagem é válida.');
+        return reply(erro('Não consegui criar a figurinha. Verifique se a imagem é válida.'));
       }
       break;
     }
@@ -401,7 +402,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       }
 
       if (!stickerMessage) {
-        return reply('⚠️ Responda a uma figurinha com /unsticker para transformá-la em imagem ou GIF/vídeo.');
+        return reply(aviso('Responda a uma figurinha com /unsticker para transformá-la em imagem ou GIF/vídeo.'));
       }
 
       await reply('⏳ Convertendo figurinha, aguarde...');
@@ -435,7 +436,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         try { fs.unlinkSync(pngPath); } catch (_) {}
       } catch (error) {
         console.error('Erro ao converter figurinha:', error);
-        return reply('⚠️ Erro ao converter a figurinha.');
+        return reply(erro('Não consegui converter a figurinha.'));
       }
       break;
     }
@@ -446,7 +447,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       const isAuthorized = db.autorizadosVer?.includes(sender);
 
       if (!isOwner && !isAuthorized) {
-        return reply('⚠️ Você não tem permissão para usar este comando.');
+        return reply(aviso('Você não tem permissão para usar este comando.'));
       }
 
       const contextInfo = msg.message?.extendedTextMessage?.contextInfo ||
@@ -489,7 +490,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       }
 
       if (!viewOnceContent) {
-        return reply('⚠️ Responda a uma mensagem de visualização única (foto ou vídeo) com /ver.');
+        return reply(aviso('Responda a uma mensagem de visualização única (foto ou vídeo) com /ver.'));
       }
 
       const mediaKey = viewOnceContent.mediaKey;
@@ -497,7 +498,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         ? mediaKey.trim().length
         : (mediaKey?.byteLength ?? mediaKey?.length ?? 0);
       if (!mediaKey || mediaKeyLength === 0) {
-        return reply('⚠️ O WhatsApp não forneceu a chave necessária para abrir esta mídia. Peça para enviarem a foto ou o vídeo novamente.');
+        return reply(aviso('O WhatsApp não forneceu a chave necessária para abrir esta mídia. Peça para enviarem a foto ou o vídeo novamente.'));
       }
 
       await reply('⏳ Baixando mídia de visualização única, aguarde...');
@@ -531,10 +532,10 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         try { fs.unlinkSync(filePath); } catch (_) {}
       } catch (error) {
         if (error?.message?.includes('Cannot derive from empty media key')) {
-          return reply('⚠️ O WhatsApp não forneceu a chave necessária para abrir esta mídia. Peça para enviarem a foto ou o vídeo novamente.');
+          return reply(aviso('O WhatsApp não forneceu a chave necessária para abrir esta mídia. Peça para enviarem a foto ou o vídeo novamente.'));
         }
         console.error('Erro ao revelar visualização única:', error);
-        return reply('⚠️ Erro ao tentar baixar e revelar a mídia.');
+        return reply(erro('Não consegui baixar e revelar a mídia.'));
       }
       break;
     }
@@ -542,7 +543,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
     case 'play': {
       const query = args.join(' ').trim();
       if (!query) {
-        return reply('⚠️ Digite o nome da música ou o link do YouTube/TikTok/Instagram. Exemplo: /play Linkin Park Numb');
+        return reply(uso('/play Linkin Park Numb', 'Digite o nome da música ou o link do YouTube, TikTok ou Instagram.'));
       }
 
       if (/(tiktok\.com|vt\.tiktok|vm\.tiktok)/i.test(query)) {
@@ -555,7 +556,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         } catch (error) {
           console.error('Erro ao baixar áudio do TikTok via /play:', error);
           const detail = error?.message ? ` (${error.message.slice(0, 120)})` : '';
-          return reply(`⚠️ Erro ao baixar áudio do TikTok${detail}.`);
+          return reply(erro(`Não consegui baixar o áudio do TikTok${detail}.`));
         } finally {
           if (music?.filePath && fs.existsSync(music.filePath)) {
             try { fs.unlinkSync(music.filePath); } catch (_) {}
@@ -572,7 +573,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
           return;
         } catch (error) {
           console.error('Erro ao baixar áudio do Instagram via /play:', error);
-          return reply('⚠️ Erro ao baixar áudio do Instagram. Verifique se a publicação é pública.');
+          return reply(erro('Não consegui baixar o áudio do Instagram. Verifique se a publicação é pública.'));
         } finally {
           if (music?.filePath && fs.existsSync(music.filePath)) {
             try { fs.unlinkSync(music.filePath); } catch (_) {}
@@ -590,7 +591,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       } catch (error) {
         console.error('Erro ao baixar música:', error);
         const detail = error?.message ? ` (${error.message.slice(0, 100)})` : '';
-        return reply(`⚠️ Erro ao buscar/baixar a música${detail}. Tente novamente em instantes.`);
+        return reply(erro(`Não consegui buscar ou baixar a música${detail}. Tente novamente em instantes.`));
       } finally {
         if (music?.filePath && fs.existsSync(music.filePath)) {
           try { fs.unlinkSync(music.filePath); } catch (_) {}
@@ -602,7 +603,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
     case 'video': {
       const query = args.join(' ');
       if (!query) {
-        return reply('⚠️ Digite o nome do vídeo ou o link do YouTube/TikTok/Instagram. Exemplo: /video Minecraft Speedrun');
+        return reply(uso('/video Minecraft Speedrun', 'Digite o nome do vídeo ou o link do YouTube, TikTok ou Instagram.'));
       }
 
       if (/tiktok\.com/i.test(query)) {
@@ -622,7 +623,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         } catch (error) {
           console.error('Erro ao baixar vídeo do TikTok via /video:', error);
           const detail = error?.message ? ` (${error.message.slice(0, 120)})` : '';
-          return reply(`⚠️ Erro ao baixar vídeo do TikTok${detail}. Verifique se o link é público e tente novamente.`);
+          return reply(erro(`Não consegui baixar o vídeo do TikTok${detail}. Verifique se o link é público e tente novamente.`));
         }
       }
 
@@ -643,7 +644,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
           return;
         } catch (error) {
           console.error('Erro ao baixar vídeo do Instagram via /video:', error);
-          return reply('⚠️ Erro ao baixar vídeo do Instagram. Verifique se a publicação é pública.');
+          return reply(erro('Não consegui baixar o vídeo do Instagram. Verifique se a publicação é pública.'));
         }
       }
 
@@ -666,7 +667,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       } catch (error) {
         console.error('Erro ao baixar vídeo:', error);
         const detail = error?.message ? ` (${error.message.slice(0, 100)})` : '';
-        return reply(`⚠️ Erro ao buscar/baixar o vídeo${detail}. O vídeo pode ser muito grande ou indisponível.`);
+        return reply(erro(`Não consegui buscar ou baixar o vídeo${detail}. O vídeo pode ser muito grande ou indisponível.`));
       }
       break;
     }
@@ -677,7 +678,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
     case 'instavideo': {
       const url = args[0];
       if (!url || !/instagram\.com/i.test(url)) {
-        return reply('⚠️ Cole um link válido do Instagram. Exemplo: `/ig https://www.instagram.com/reel/...`');
+        return reply(uso('/ig https://www.instagram.com/reel/...', 'Cole um link válido do Instagram.'));
       }
 
       await reply('⏳ Baixando vídeo do Instagram, aguarde...');
@@ -696,7 +697,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         fs.unlinkSync(video.filePath);
       } catch (error) {
         console.error('Erro ao baixar vídeo do Instagram:', error);
-        return reply('⚠️ Erro ao baixar vídeo do Instagram. Verifique o link e tente novamente.');
+        return reply(erro('Não consegui baixar o vídeo do Instagram. Verifique o link e tente novamente.'));
       }
       break;
     }
@@ -706,7 +707,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
     case 'igplay': {
       const url = args[0];
       if (!url || !/instagram\.com/i.test(url)) {
-        return reply('⚠️ Cole um link válido do Instagram. Exemplo: `/igaudio https://www.instagram.com/reel/...`');
+        return reply(uso('/igaudio https://www.instagram.com/reel/...', 'Cole um link válido do Instagram.'));
       }
 
       await reply('⏳ Baixando áudio do Instagram, aguarde...');
@@ -717,7 +718,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         fs.unlinkSync(music.filePath);
       } catch (error) {
         console.error('Erro ao baixar áudio do Instagram:', error);
-        return reply('⚠️ Erro ao baixar áudio do Instagram. Verifique o link e tente novamente.');
+        return reply(erro('Não consegui baixar o áudio do Instagram. Verifique o link e tente novamente.'));
       }
       break;
     }
@@ -726,7 +727,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
     case 'ttvideo': {
       const url = args[0];
       if (!url || !/tiktok\.com/i.test(url)) {
-        return reply('⚠️ Cole um link válido do TikTok. Exemplo: `/tiktok https://vm.tiktok.com/...`');
+        return reply(uso('/tiktok https://vm.tiktok.com/...', 'Cole um link válido do TikTok.'));
       }
 
       await reply('⏳ Baixando vídeo do TikTok sem marca d\'água, aguarde...');
@@ -745,7 +746,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       } catch (error) {
         console.error('Erro ao baixar vídeo do TikTok:', error);
         const detail = error?.message ? ` (${error.message.slice(0, 120)})` : '';
-        return reply(`⚠️ Erro ao baixar vídeo do TikTok${detail}. Verifique o link e tente novamente.`);
+        return reply(erro(`Não consegui baixar o vídeo do TikTok${detail}. Verifique o link e tente novamente.`));
       }
       break;
     }
@@ -754,7 +755,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
     case 'ttplay': {
       const url = args[0];
       if (!url || !/tiktok\.com/i.test(url)) {
-        return reply('⚠️ Cole um link válido do TikTok. Exemplo: `/tiktokaudio https://vm.tiktok.com/...`');
+        return reply(uso('/tiktokaudio https://vm.tiktok.com/...', 'Cole um link válido do TikTok.'));
       }
 
       await reply('⏳ Baixando áudio do TikTok, aguarde...');
@@ -766,7 +767,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       } catch (error) {
         console.error('Erro ao baixar áudio do TikTok:', error);
         const detail = error?.message ? ` (${error.message.slice(0, 120)})` : '';
-        return reply(`⚠️ Erro ao baixar áudio do TikTok${detail}. Verifique o link e tente novamente.`);
+        return reply(erro(`Não consegui baixar o áudio do TikTok${detail}. Verifique o link e tente novamente.`));
       }
       break;
     }

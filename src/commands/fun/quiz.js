@@ -1,6 +1,7 @@
 import { getUser, updateUser } from '../../database/sqlite.js';
 import { askAi } from '../../utils/aiService.js';
 import { calculateBonusRewards } from '../../utils/bonusCalculator.js';
+import { cabecalho, linha, info } from '../../config/messages.js';
 
 const fallbackQuestions = [
   { question: 'Qual o maior planeta do Sistema Solar?', answer: 'júpiter', altAnswers: ['jupiter'], options: ['Terra', 'Júpiter', 'Saturno', 'Marte'] },
@@ -38,10 +39,10 @@ export async function handleQuizCommand(sock, msg, args, sender) {
   }
 
   if (activeQuiz) {
-    const text = `🧠 *QUIZ EM ANDAMENTO*\n\n` +
-                 `❓ *Pergunta:* ${activeQuiz.question}\n\n` +
-                 `💡 *Opções:* ${activeQuiz.options.join(', ')}\n\n` +
-                 `👉 *Digite a resposta correta no chat!*`;
+    const text = `${cabecalho('🧠', 'Quiz em Andamento')}\n\n` +
+                 `${linha('Pergunta', activeQuiz.question)}\n\n` +
+                 `${linha('Opções', activeQuiz.options.join(', '))}\n\n` +
+                 `👉 Digite a resposta correta no chat!`;
     return sock.sendMessage(from, { text }, { quoted: msg });
   }
 
@@ -74,7 +75,7 @@ async function generateAiQuestion() {
 }
 
 async function startNewAiQuiz(sock, msg, from) {
-  await sock.sendMessage(from, { text: '🧠 *Gerando pergunta inédita com IA, aguarde...*' }, { quoted: msg });
+  await sock.sendMessage(from, { text: '🧠 Gerando uma pergunta inédita com IA, aguarde...' }, { quoted: msg });
 
   const q = await generateAiQuestion();
 
@@ -85,10 +86,10 @@ async function startNewAiQuiz(sock, msg, from) {
     options: q.options
   });
 
-  const text = `🧠 *QUIZ DE IA INÉDITO*\n\n` +
-               `❓ *Pergunta:* ${q.question}\n\n` +
-               `💡 *Opções:* ${q.options.join(', ')}\n\n` +
-               `📌 *Responda diretamente no chat!* (+50 XP e +$200 de bônus!)`;
+  const text = `${cabecalho('🧠', 'Quiz de IA Inédito')}\n\n` +
+               `${linha('Pergunta', q.question)}\n\n` +
+               `${linha('Opções', q.options.join(', '))}\n\n` +
+               `${info('Responda diretamente no chat! Prêmio: *+50 XP* e *+$200* de bônus.')}`;
 
   return sock.sendMessage(from, { text }, { quoted: msg });
 }
@@ -121,10 +122,10 @@ export async function processQuizAnswer(sock, msg, from, userResponse, sender) {
 
     const bonusStr = (bonusCoinsApplied > 0 || bonusXpApplied > 0) ? ` *(com bônus de classe/evento!)*` : '';
 
-    const text = `🎉 *RESPOSTA CORRETA!* @${sender.split('@')[0]} acertou em cheio!\n\n` +
-                 `❓ *Pergunta:* ${activeQuiz.question}\n` +
-                 `✅ *Resposta:* *${activeQuiz.answer.toUpperCase()}*\n\n` +
-                 `🎁 *Prêmio:* +$${rewardCoins.toLocaleString('pt-BR')} moedas e +${rewardXp} XP!${bonusStr} 🏆`;
+    const text = `${cabecalho('🎉', 'Resposta Correta!')} @${sender.split('@')[0]} acertou em cheio!\n\n` +
+                 `${linha('Pergunta', activeQuiz.question)}\n` +
+                 `${linha('Resposta', activeQuiz.answer.toUpperCase())}\n\n` +
+                 `🎁 Prêmio: *+$${rewardCoins.toLocaleString('pt-BR')}* moedas e *+${rewardXp} XP*!${bonusStr} 🏆`;
 
     await sock.sendMessage(from, { text, mentions: [sender] }, { quoted: msg });
     return true;

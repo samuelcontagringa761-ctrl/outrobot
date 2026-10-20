@@ -2,6 +2,7 @@ import { getUser, updateUser, deductBalance, addBalance, addXP } from '../databa
 import { askAi } from '../utils/aiService.js';
 import { calculateBonusRewards } from '../utils/bonusCalculator.js';
 import { validateEconomicValue, sanitizeMoney, sanitizeXP } from '../utils/economicValidation.js';
+import { cabecalho, erro, linha, uso } from '../config/messages.js';
 
 async function getAiCommentary(prompt, sysInstruction) {
   try {
@@ -24,13 +25,13 @@ export async function handleMinigamesCommands(sock, msg, command, args, sender, 
     case '21': {
       const rawBet = sanitizeMoney(args[0], 500);
       if (!validateEconomicValue(args[0]) || rawBet <= 0) {
-        return reply('⚠️ Informe uma aposta válida maior que zero.\nExemplo: `/blackjack 1000`');
+        return reply(uso('/blackjack 1000', 'Informe uma aposta válida, maior que zero.'));
       }
 
       // Tenta deduzir a aposta atómicamente ANTES do resultado
       const deducted = await deductBalance(sender, rawBet);
       if (!deducted) {
-        return reply(`⚠️ Você não possui **$${rawBet.toLocaleString('pt-BR')}** na carteira para apostar.`);
+        return reply(erro(`Você não possui *$${rawBet.toLocaleString('pt-BR')}* na carteira para apostar.`));
       }
 
       const pCard1 = Math.floor(Math.random() * 10) + 1;
@@ -71,7 +72,7 @@ export async function handleMinigamesCommands(sock, msg, command, args, sender, 
       const prompt = `O jogador tirou ${pCard1} e ${pCard2} (total ${playerTotal}). O crupiê tirou ${dCard1} e ${dCard2} (total ${dealerTotal}). Resultado: ${won ? 'Jogador Venceu' : draw ? 'Empate' : 'Jogador Perdeu'}.`;
       const aiStory = await getAiCommentary(prompt, sys) || (won ? 'As cartas sorriram para você na mesa!' : draw ? 'Cartas idênticas! Ninguém ganha, ninguém perde.' : 'A casa sempre vence!');
 
-      const text = `🃏 *BLACKJACK (21) CASSINO IA* 🃏\n\n` +
+      const text = `${cabecalho('🃏', 'Blackjack (21) — Cassino IA')}\n\n` +
                    `🎴 *Suas Cartas:* [${pCard1}] [${pCard2}] ➔ *Total: ${playerTotal}*\n` +
                    `🎰 *Mesa do Crupiê:* [${dCard1}] [${dCard2}] ➔ *Total: ${dealerTotal}*\n\n` +
                    `${won ? `🎉 *VOCÊ VENCEU!* (+$${netProfit.toLocaleString('pt-BR')} moedas | +${xpEarned} XP)` : draw ? '⚖️ *EMPATE!* Sua aposta foi devolvida.' : `💥 *VOCÊ PERDEU!* (-$${rawBet.toLocaleString('pt-BR')})`}\n\n` +
@@ -83,13 +84,13 @@ export async function handleMinigamesCommands(sock, msg, command, args, sender, 
     case 'poker': {
       const rawBet = sanitizeMoney(args[0], 500);
       if (!validateEconomicValue(args[0]) || rawBet <= 0) {
-        return reply('⚠️ Informe uma aposta válida maior que zero.\nExemplo: `/poker 1000`');
+        return reply(uso('/poker 1000', 'Informe uma aposta válida, maior que zero.'));
       }
 
       // Deduz a aposta atómicamente ANTES de jogar
       const deducted = await deductBalance(sender, rawBet);
       if (!deducted) {
-        return reply(`⚠️ Você precisa de **$${rawBet.toLocaleString('pt-BR')}** na carteira para jogar Poker.`);
+        return reply(erro(`Você precisa de *$${rawBet.toLocaleString('pt-BR')}* na carteira para jogar Poker.`));
       }
 
       const hands = ['Mão Alta', 'Um Par', 'Dois Pares', 'Trinca', 'Sequência', 'Flush', 'Full House', 'Quadra', 'Royal Flush'];
@@ -117,9 +118,9 @@ export async function handleMinigamesCommands(sock, msg, command, args, sender, 
       const prompt = `Showdown! Jogador revelou ${hands[playerHandIdx]} contra a mesa com ${hands[botHandIdx]}. Resultado: ${won ? 'Vitória' : draw ? 'Empate' : 'Derrota'}.`;
       const aiStory = await getAiCommentary(prompt, sys) || (won ? 'Que jogada espetacular na mesa de apostas!' : draw ? 'Empate perfeito na mesa!' : 'Seu blefe não funcionou desta vez.');
 
-      const text = `♠️ *MESA DE POKER HIGH ROLLER IA* ♠️\n\n` +
-                   `🎴 *Sua Mão:* **${hands[playerHandIdx]}**\n` +
-                   `🤖 *Mão da Banca:* **${hands[botHandIdx]}**\n\n` +
+      const text = `${cabecalho('♠️', 'Mesa de Poker High Roller IA')}\n\n` +
+                   `🎴 *Sua Mão:* *${hands[playerHandIdx]}*\n` +
+                   `🤖 *Mão da Banca:* *${hands[botHandIdx]}*\n\n` +
                    `${won ? `🏆 *VITÓRIA NO POKER!* (+$${gain.toLocaleString('pt-BR')} moedas | +${xpEarned} XP)` : draw ? '⚖️ *EMPATE!* Aposta devolvida.' : `💸 *PERDEU A MÃO!* (-$${rawBet.toLocaleString('pt-BR')})`}\n\n` +
                    `🎙️ *Narrador de Poker (IA):*\n_"${aiStory}"_`;
 
@@ -130,13 +131,13 @@ export async function handleMinigamesCommands(sock, msg, command, args, sender, 
     case 'slots': {
       const rawBet = sanitizeMoney(args[0], 500);
       if (!validateEconomicValue(args[0]) || rawBet <= 0) {
-        return reply('⚠️ Informe uma aposta válida maior que zero.\nExemplo: `/slots 500`');
+        return reply(uso('/slots 500', 'Informe uma aposta válida, maior que zero.'));
       }
 
       // Deduz a aposta atómicamente ANTES de girar
       const deducted = await deductBalance(sender, rawBet);
       if (!deducted) {
-        return reply(`⚠️ Saldo insuficiente na carteira para o Caça-Níquel.`);
+        return reply(erro('Saldo insuficiente na carteira para o Caça-Níquel.'));
       }
 
       const symbols = ['💎', '7️⃣', '🔔', '🍋', '🍒', '🌟'];
@@ -167,11 +168,11 @@ export async function handleMinigamesCommands(sock, msg, command, args, sender, 
       const prompt = `Resultado das roletas: [${s1}] [${s2}] [${s3}]. Multiplicador: ${multiplier}x.`;
       const aiStory = await getAiCommentary(prompt, sys) || 'A roleta girou e o destino foi selado!';
 
-      const text = `🎰 *CAÇA-NÍQUEL CASSINO IA* 🎰\n\n` +
+      const text = `${cabecalho('🎰', 'Caça-Níquel Cassino IA')}\n\n` +
                    `╔═════════════╗\n` +
                    `  [ ${s1} | ${s2} | ${s3} ]  \n` +
                    `╚═════════════╝\n\n` +
-                   `${multiplier > 0 ? `🎉 *JACKPOT!* Ganhou **${multiplier}x** (+$${profit.toLocaleString('pt-BR')} moedas | +${xpEarned} XP)` : `💔 *NÃO FOI DESSA VEZ!* (-$${rawBet.toLocaleString('pt-BR')})`}\n\n` +
+                   `${multiplier > 0 ? `🎉 *JACKPOT!* Ganhou *${multiplier}x* (+$${profit.toLocaleString('pt-BR')} moedas | +${xpEarned} XP)` : `💔 *NÃO FOI DESSA VEZ!* (-$${rawBet.toLocaleString('pt-BR')})`}\n\n` +
                    `✨ *Voz da Roleta (IA):*\n_"${aiStory}"_`;
 
       return reply(text);
@@ -187,7 +188,7 @@ export async function handleMinigamesCommands(sock, msg, command, args, sender, 
         const remaining = COOLDOWN - (now - lastPesca);
         const minutes = Math.floor(remaining / (1000 * 60));
         const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-        return reply(`⏳ *SUA VARA DE PESCA ESTÁ RECOLHIDA!*\n\nVocê precisa esperar os peixes voltarem a nadar.\n⏱️ *Aguarde:* *${minutes}m ${seconds}s* para pescar novamente.`);
+        return reply(`⏳ *SUA VARA DE PESCA ESTÁ RECOLHIDA!*\n\nVocê precisa esperar os peixes voltarem a nadar.\n${linha('Aguarde', `${minutes}m ${seconds}s`)} para pescar novamente.`);
       }
 
       const catches = [
@@ -219,9 +220,9 @@ export async function handleMinigamesCommands(sock, msg, command, args, sender, 
       const bonusCoinsStr = bonusCoinsApplied > 0 ? ` *(+$${bonusCoinsApplied.toLocaleString('pt-BR')} bônus)*` : '';
       const bonusXpStr = bonusXpApplied > 0 ? ` *(+${bonusXpApplied} XP bônus)*` : '';
 
-      const text = `🎣 *EXPEDIÇÃO DE PESCA IA* 🎣\n\n` +
+      const text = `${cabecalho('🎣', 'Expedição de Pesca IA')}\n\n` +
                    `🌊 Você jogou o anzol no lago e fisgou:\n` +
-                   `👉 **${item.name}**!\n` +
+                   `👉 *${item.name}*!\n` +
                    `💰 *Valor de Venda:* +$${safeCoins.toLocaleString('pt-BR')} moedas${bonusCoinsStr}\n` +
                    `✨ *XP da Pesca:* +${safeXp} XP${bonusXpStr}${levelUpMsg}\n\n` +
                    `📜 *Relato do Velho Pescador (IA):*\n_"${aiStory}"_`;

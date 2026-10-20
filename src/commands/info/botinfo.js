@@ -1,4 +1,5 @@
 import os from 'os';
+import { cabecalho, linha } from '../../config/messages.js';
 
 export async function handleBotinfoCommand(sock, msg) {
   const from = msg.key.remoteJid;
@@ -7,11 +8,11 @@ export async function handleBotinfoCommand(sock, msg) {
   const platform = os.platform();
   const cpus = os.cpus().length;
 
-  const text = `📊 *ESTATÍSTICAS TÉCNICAS DO BOT*\n\n` +
-               `💻 *Sistema Operacional:* ${platform}\n` +
-               `🧠 *Uso de Memória RAM:* ${memoryUsage} MB / ${totalMem} GB\n` +
-               `⚙️ *Processadores (Cores):* ${cpus} cores\n` +
-               `🟢 *Node.js:* ${process.version}`;
+  const text = `${cabecalho('📊', 'Estatísticas técnicas do bot')}\n\n` +
+               `${linha('Sistema operacional', platform)}\n` +
+               `${linha('Uso de memória RAM', `${memoryUsage} MB / ${totalMem} GB`)}\n` +
+               `${linha('Processadores (cores)', `${cpus} cores`)}\n` +
+               `${linha('Node.js', process.version)}`;
 
   return sock.sendMessage(from, { text }, { quoted: msg });
 }

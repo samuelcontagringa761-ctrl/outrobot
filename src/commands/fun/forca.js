@@ -1,5 +1,6 @@
 // Módulo de Jogo da Forca com Geração Dinâmica de Palavras via IA
 import { askAi } from '../../utils/aiService.js';
+import { aviso, erro, sucesso, cabecalho, linha, uso } from '../../config/messages.js';
 
 const fallbackWords = [
   { word: 'WHATSAPP', hint: 'Aplicativo de mensagens' },
@@ -135,19 +136,19 @@ export async function handleForcaCommand(sock, msg, args, sender) {
   const masked = renderMaskedWord(game.word, game.guessedLetters);
   const lives = renderHangingStatus(game.wrongAttempts, game.maxAttempts);
 
-  const text = `🎯 *JOGO DA FORCA EM ANDAMENTO*\n\n` +
-               `💡 *Dica:* ${game.hint}\n` +
-               `🔤 *Palavra:* \`${masked}\`\n\n` +
-               `❤️ *Vidas:* ${lives} (${game.maxAttempts - game.wrongAttempts}/${game.maxAttempts})\n` +
-               `📝 *Letras já tentadas:* ${game.guessedLetters.length > 0 ? game.guessedLetters.join(', ') : 'Nenhuma'}\n\n` +
-               `👉 *Como jogar:* Envie uma letra ou a palavra inteira no chat (ex: \`A\` ou \`/forca A\`)!`;
+  const text = `${cabecalho('🎯', 'Jogo da Forca em Andamento')}\n\n` +
+               `${linha('Dica', game.hint)}\n` +
+               `${linha('Palavra', `\`${masked}\``)}\n\n` +
+               `${linha('Vidas', `${lives} (${game.maxAttempts - game.wrongAttempts}/${game.maxAttempts})`)}\n` +
+               `${linha('Letras já tentadas', game.guessedLetters.length > 0 ? game.guessedLetters.join(', ') : 'Nenhuma')}\n\n` +
+               `${uso('/forca A', 'Envie uma letra ou a palavra inteira no chat.')}`;
 
   return sock.sendMessage(from, { text }, { quoted: msg });
 }
 
 // Inicia um novo jogo com IA
 export async function startNewForcaGame(sock, msg, from) {
-  await sock.sendMessage(from, { text: '🎯 *Gerando nova palavra secreta com IA, aguarde...*' }, { quoted: msg });
+  await sock.sendMessage(from, { text: '🎯 Gerando uma nova palavra secreta com IA, aguarde...' }, { quoted: msg });
 
   const gameData = await generateAiForcaWord();
 
@@ -164,11 +165,11 @@ export async function startNewForcaGame(sock, msg, from) {
   const masked = renderMaskedWord(game.word, game.guessedLetters);
   const lives = renderHangingStatus(0, game.maxAttempts);
 
-  const text = `🎯 *NOVO JOGO DA FORCA DE IA INICIADO!*\n\n` +
-               `💡 *Dica:* ${game.hint}\n` +
-               `🔤 *Palavra:* \`${masked}\` (${game.word.length} letras)\n\n` +
-               `❤️ *Vidas:* ${lives}\n\n` +
-               `💬 *Como jogar:* Envie qualquer letra ou palpite diretamente no chat!`;
+  const text = `${cabecalho('🎯', 'Novo Jogo da Forca de IA')}\n\n` +
+               `${linha('Dica', game.hint)}\n` +
+               `${linha('Palavra', `\`${masked}\``)} (${game.word.length} letras)\n\n` +
+               `${linha('Vidas', lives)}\n\n` +
+               `${uso('/forca A', 'Envie qualquer letra ou o palpite completo no chat.')}`;
 
   return sock.sendMessage(from, { text }, { quoted: msg });
 }
@@ -184,7 +185,7 @@ export async function processForcaGuess(sock, msg, from, guess, sender) {
   // Se for apenas uma letra
   if (cleanGuess.length === 1) {
     if (game.guessedLetters.includes(cleanGuess)) {
-      await sock.sendMessage(from, { text: `⚠️ A letra *${cleanGuess}* já foi tentada anteriormente!` }, { quoted: msg });
+      await sock.sendMessage(from, { text: aviso(`A letra *${cleanGuess}* já foi tentada anteriormente.`) }, { quoted: msg });
       return true;
     }
 
@@ -197,17 +198,17 @@ export async function processForcaGuess(sock, msg, from, guess, sender) {
       // Verificar vitória
       if (!masked.includes('_')) {
         activeForcaGames.delete(from);
-        const text = `🎉 *PARABÉNS!* @${sender.split('@')[0]} acertou a última letra e venceu a Forca!\n\n` +
-                     `🔤 *Palavra completa:* *${game.word}* 🏆`;
+        const text = `${cabecalho('🎉', 'Parabéns!')} @${sender.split('@')[0]} acertou a última letra e venceu a Forca!\n\n` +
+                     `${linha('Palavra completa', game.word)} 🏆`;
         await sock.sendMessage(from, { text, mentions: [sender] }, { quoted: msg });
         return true;
       }
 
       const lives = renderHangingStatus(game.wrongAttempts, game.maxAttempts);
-      const text = `✅ Boa! A letra *${cleanGuess}* existe na palavra!\n\n` +
-                   `🔤 *Palavra:* \`${masked}\`\n` +
-                   `❤️ *Vidas:* ${lives}\n` +
-                   `📝 *Tentativas:* ${game.guessedLetters.join(', ')}`;
+      const text = `${sucesso(`Boa! A letra *${cleanGuess}* existe na palavra!`)}\n\n` +
+                   `${linha('Palavra', `\`${masked}\``)}\n` +
+                   `${linha('Vidas', lives)}\n` +
+                   `${linha('Tentativas', game.guessedLetters.join(', '))}`;
       await sock.sendMessage(from, { text }, { quoted: msg });
       return true;
     } 
@@ -219,17 +220,18 @@ export async function processForcaGuess(sock, msg, from, guess, sender) {
       // Verificar derrota
       if (game.wrongAttempts >= game.maxAttempts) {
         activeForcaGames.delete(from);
-        const text = `☠️ *GAME OVER!* As vidas acabaram e a forca foi armada!\n\n` +
-                     `❌ *A palavra secreta era:* *${game.word}*`;
+        const text = `${cabecalho('☠️', 'Game Over!')}\n\n` +
+                     `As vidas acabaram e a forca foi armada!\n\n` +
+                     `${erro(`A palavra secreta era *${game.word}*.`)}`;
         await sock.sendMessage(from, { text }, { quoted: msg });
         return true;
       }
 
       const masked = renderMaskedWord(game.word, game.guessedLetters);
-      const text = `❌ A letra *${cleanGuess}* NÃO existe na palavra!\n\n` +
-                   `🔤 *Palavra:* \`${masked}\`\n` +
-                   `❤️ *Vidas:* ${lives} (${game.maxAttempts - game.wrongAttempts}/${game.maxAttempts})\n` +
-                   `📝 *Tentativas:* ${game.guessedLetters.join(', ')}`;
+      const text = `${erro(`A letra *${cleanGuess}* não existe na palavra!`)}\n\n` +
+                   `${linha('Palavra', `\`${masked}\``)}\n` +
+                   `${linha('Vidas', `${lives} (${game.maxAttempts - game.wrongAttempts}/${game.maxAttempts})`)}\n` +
+                   `${linha('Tentativas', game.guessedLetters.join(', '))}`;
       await sock.sendMessage(from, { text }, { quoted: msg });
       return true;
     }
@@ -238,8 +240,8 @@ export async function processForcaGuess(sock, msg, from, guess, sender) {
   else {
     if (cleanGuess === game.word) {
       activeForcaGames.delete(from);
-      const text = `🎉 *INCRÍVEL!* @${sender.split('@')[0]} adivinhou a palavra inteira e venceu a Forca!\n\n` +
-                   `🔤 *Palavra:* *${game.word}* 🏆`;
+      const text = `${cabecalho('🎉', 'Incrível!')} @${sender.split('@')[0]} adivinhou a palavra inteira e venceu a Forca!\n\n` +
+                   `${linha('Palavra', game.word)} 🏆`;
       await sock.sendMessage(from, { text, mentions: [sender] }, { quoted: msg });
       return true;
     } else {
@@ -248,16 +250,17 @@ export async function processForcaGuess(sock, msg, from, guess, sender) {
 
       if (game.wrongAttempts >= game.maxAttempts) {
         activeForcaGames.delete(from);
-        const text = `☠️ *GAME OVER!* A palavra *${cleanGuess}* estava errada e suas vidas acabaram!\n\n` +
-                     `❌ *A palavra secreta era:* *${game.word}*`;
+        const text = `${cabecalho('☠️', 'Game Over!')}\n\n` +
+                     `A palavra *${cleanGuess}* estava errada e as vidas acabaram!\n\n` +
+                     `${erro(`A palavra secreta era *${game.word}*.`)}`;
         await sock.sendMessage(from, { text }, { quoted: msg });
         return true;
       }
 
       const masked = renderMaskedWord(game.word, game.guessedLetters);
-      const text = `❌ A palavra *${cleanGuess}* está errada!\n\n` +
-                   `🔤 *Palavra:* \`${masked}\`\n` +
-                   `❤️ *Vidas:* ${lives}`;
+      const text = `${erro(`A palavra *${cleanGuess}* está errada!`)}\n\n` +
+                   `${linha('Palavra', `\`${masked}\``)}\n` +
+                   `${linha('Vidas', lives)}`;
       await sock.sendMessage(from, { text }, { quoted: msg });
       return true;
     }

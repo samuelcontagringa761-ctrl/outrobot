@@ -190,7 +190,9 @@ class QueueManager {
   }
 
   sendMessage(sock, jid, content, options = {}, priority = null) {
-    const prio = priority || (content?.text && (content.text.includes('erro') || content.text.includes('⚠️')) ? Priority.HIGH : Priority.NORMAL);
+    // Respostas de erro/aviso furam a fila: o usuário precisa do retorno na hora.
+    const texto = content?.text || '';
+    const prio = priority || (/^[❌⚠️]/.test(texto) || texto.includes('erro') ? Priority.HIGH : Priority.NORMAL);
     return new Promise((resolve, reject) => {
       this.enqueueMessage(
         jid,

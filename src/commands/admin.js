@@ -1,6 +1,7 @@
 import { getDatabase, updateDatabase } from '../database.js';
 import { jidNormalizedUser } from '@whiskeysockets/baileys';
 import dotenv from 'dotenv';
+import { grupoApenas, adminOuDonoApenas, donoApenas, botPrecisaAdmin, marcaAlguem, alvoNaoEncontrado, aviso, erro, uso, estado } from '../config/messages.js';
 dotenv.config();
 
 // Normaliza um JID para comparação (minúsculo, sem sufixo de dispositivo)
@@ -150,7 +151,7 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
   switch (command) {
     case 'ban': {
       if (!isGroup) {
-        return reply('⚠️ Este comando só pode ser utilizado em grupos.');
+        return reply(grupoApenas());
       }
 
       // Obter metadados do grupo
@@ -158,7 +159,7 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
       try {
         groupMetadata = await sock.groupMetadata(from);
       } catch (err) {
-        return reply('⚠️ Não foi possível obter os metadados do grupo.');
+        return reply(erro('Não foi possível obter os metadados do grupo.'));
       }
 
       const participants = groupMetadata.participants;
@@ -166,12 +167,12 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
       // Verificar se o solicitante é admin ou dono
       const senderAdmin = isAdmin(participants, sender);
       if (!senderAdmin && !isSenderOwner) {
-        return reply('⚠️ Apenas administradores do grupo ou o dono do bot podem utilizar este comando.');
+        return reply(adminOuDonoApenas());
       }
 
       // Verificar se o bot é admin (checagem compatível com grupos LID e PN)
       if (!isBotAdmin(participants, sock)) {
-        return reply('⚠️ Eu preciso ser administrador do grupo para poder banir participantes.');
+        return reply(botPrecisaAdmin());
       }
 
       // Determinar o alvo (mencionado ou citado)
@@ -181,21 +182,21 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
       }
 
       if (!target) {
-        return reply('⚠️ Marque alguém ou responda a mensagem da pessoa que deseja banir.');
+        return reply(marcaAlguem());
       }
 
       const resolved = resolveActionTarget(groupMetadata, target);
       if (!resolved) {
-        return reply('⚠️ Não encontrei essa pessoa na lista de participantes do grupo.');
+        return reply(alvoNaoEncontrado());
       }
       const actionJid = resolved.actionJid;
 
       if (isBotJid(sock, target)) {
-        return reply('⚠️ Eu não posso me banir!');
+        return reply(aviso('Eu não posso me banir!'));
       }
 
       if (isPhoneJid(target) && checkIfOwner(target)) {
-        return reply('⚠️ Eu não posso banir o meu dono!');
+        return reply(aviso('Não posso banir o meu dono!'));
       }
 
       // Banir o participante
@@ -207,13 +208,13 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
         return reply(`🔨 @${actionJid.split('@')[0]} foi banido com sucesso.`, [actionJid]);
       } catch (error) {
         console.error('Erro ao banir participante:', error);
-        return reply('⚠️ Erro ao tentar remover o participante. Talvez ele seja o criador do grupo ou eu não tenha permissão.');
+        return reply(erro('Não foi possível remover o participante. Talvez ele seja o criador do grupo ou eu não tenha permissão.'));
       }
     }
 
     case 'adm': {
       if (!isSenderOwner) {
-        return reply('⚠️ Apenas o dono do bot pode utilizar este comando.');
+        return reply(donoApenas());
       }
 
       let target = mentioned[0];
@@ -222,7 +223,7 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
       }
 
       if (!target) {
-        return reply('⚠️ Marque ou responda à pessoa que deseja autorizar.');
+        return reply(marcaAlguem());
       }
 
       let jaAutorizado = false;
@@ -235,7 +236,7 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
       });
 
       if (jaAutorizado) {
-        return reply(`⚠️ @${target.split('@')[0]} já está na lista de autorizados para usar /ver.`, [target]);
+        return reply(aviso(`@${target.split('@')[0]} já está na lista de autorizados para usar /ver.`), [target]);
       }
 
       return reply(`🔑 @${target.split('@')[0]} foi autorizado com sucesso para usar /ver.`, [target]);
@@ -243,7 +244,7 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
 
     case 'remover': {
       if (!isSenderOwner) {
-        return reply('⚠️ Apenas o dono do bot pode utilizar este comando.');
+        return reply(donoApenas());
       }
 
       let target = mentioned[0];
@@ -252,7 +253,7 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
       }
 
       if (!target) {
-        return reply('⚠️ Marque ou responda à pessoa que deseja remover a autorização.');
+        return reply(marcaAlguem());
       }
 
       let removido = false;
@@ -265,7 +266,7 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
       });
 
       if (!removido) {
-        return reply(`⚠️ @${target.split('@')[0]} não estava na lista de autorizados.`, [target]);
+        return reply(aviso(`@${target.split('@')[0]} não estava na lista de autorizados.`), [target]);
       }
 
       return reply(`🚫 @${target.split('@')[0]} teve sua autorização para usar /ver removida.`, [target]);
@@ -273,16 +274,16 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
 
     case 'antidel': {
       if (!isGroup) {
-        return reply('⚠️ Este comando só pode ser utilizado em grupos.');
+        return reply(grupoApenas());
       }
 
       if (!isSenderOwner) {
-        return reply('⚠️ Apenas o dono do bot pode ativar/desativar o anti-delete.');
+        return reply(donoApenas());
       }
 
       const param = args[0]?.toLowerCase();
       if (param !== 'on' && param !== 'off') {
-        return reply('⚠️ Uso incorreto. Use: /antidel on ou /antidel off');
+        return reply(uso('/antidel on', 'Use `/antidel off` para desativar.'));
       }
 
       const active = param === 'on';
@@ -294,7 +295,7 @@ export async function handleAdminCommands(sock, msg, command, args, sender, ment
         db.configGrupos[from].antiDelete = active;
       });
 
-      return reply(`🗑️ Anti-delete foi ${active ? '*ATIVADO*' : '*DESATIVADO*'} para este grupo.`);
+      return reply(`🗑️ Anti-delete foi *${estado(active)}* para este grupo.`);
     }
 
     default:

@@ -1,4 +1,5 @@
 import { getUser, updateUser } from '../database/sqlite.js';
+import { aviso, cabecalho, erro, marcaAlguem, uso } from '../config/messages.js';
 
 export async function handleGroupReputationCommands(sock, msg, command, args, sender, mentioned) {
   const from = msg.key.remoteJid;
@@ -13,7 +14,7 @@ export async function handleGroupReputationCommands(sock, msg, command, args, se
     case 'unrep': {
       const target = mentioned[0] || msg.message?.extendedTextMessage?.contextInfo?.participant;
       if (!target || target === sender) {
-        return reply('⚠️ Marque o membro que deseja dar ou tirar reputação!\nExemplo: `/rep @usuario` ou `/unrep @usuario`');
+        return reply(marcaAlguem());
       }
 
       const targetUser = getUser(target);
@@ -30,15 +31,15 @@ export async function handleGroupReputationCommands(sock, msg, command, args, se
       updateUser(target, { extra_data: JSON.stringify(targetExtra) });
 
       return reply(`${isPositive ? '⭐ *REPUTAÇÃO AUMENTADA!*' : '📉 *REPUTAÇÃO DIMINUÍDA!*'}\n\n` +
-                   `• *Membro:* @${target.split('@')[0]}\n` +
-                   `• *Pontos de Reputação:* ${newRep > 0 ? `+${newRep}` : newRep}`, [target]);
+                   `• Membro: *@${target.split('@')[0]}*\n` +
+                   `• Pontos de Reputação: *${newRep > 0 ? `+${newRep}` : newRep}*`, [target]);
     }
 
     case 'enquete':
     case 'poll': {
       const fullText = args.join(' ').trim();
       if (!fullText.includes('|')) {
-        return reply('⚠️ Formato incorreto! Separe a pergunta e as opções por barra vertica (`|`).\nExemplo: `/enquete Qual o melhor jogo? | GTA V | Minecraft | Valorant`');
+        return reply(uso('/enquete Qual o melhor jogo? | GTA V | Minecraft | Valorant', 'Separe a pergunta e as opções por barra vertical (`|`).'));
       }
 
       const parts = fullText.split('|').map(p => p.trim()).filter(Boolean);
@@ -46,7 +47,7 @@ export async function handleGroupReputationCommands(sock, msg, command, args, se
       const options = parts.slice(1);
 
       if (options.length < 2) {
-        return reply('⚠️ Forneça pelo menos 2 opções de resposta para a enquete.');
+        return reply(aviso('Forneça pelo menos 2 opções de resposta para a enquete.'));
       }
 
       try {
@@ -59,7 +60,7 @@ export async function handleGroupReputationCommands(sock, msg, command, args, se
         });
       } catch (err) {
         console.error('Erro ao enviar enquete:', err);
-        return reply('⚠️ Não foi possível criar a enquete nativa neste chat.');
+        return reply(erro('Não foi possível criar a enquete nativa neste chat.'));
       }
       return;
     }
@@ -67,15 +68,15 @@ export async function handleGroupReputationCommands(sock, msg, command, args, se
     case 'ticket': {
       const topic = args.join(' ').trim();
       if (!topic) {
-        return reply('⚠️ Digite o motivo ou dúvida do seu ticket.\nExemplo: `/ticket Preciso de ajuda com o comando /saldo`');
+        return reply(uso('/ticket Preciso de ajuda com o comando /saldo', 'Digite o motivo ou a dúvida do seu ticket.'));
       }
 
       const ticketId = Math.floor(100000 + Math.random() * 900000);
-      return reply(`🎟️ *TICKET DE SUPORTE ABERTO!* 🎟️\n\n` +
-                   `• *ID do Ticket:* #${ticketId}\n` +
-                   `• *Solicitante:* @${sender.split('@')[0]}\n` +
-                   `• *Assunto:* "${topic}"\n\n` +
-                   `📌 _Um administrador do grupo ou suporte entrará em contato em breve!_`, [sender]);
+      return reply(`${cabecalho('🎟️', 'Ticket de suporte aberto!')}\n\n` +
+                   `• ID do Ticket: *#${ticketId}*\n` +
+                   `• Solicitante: *@${sender.split('@')[0]}*\n` +
+                   `• Assunto: *"${topic}"*\n\n` +
+                   `📌 _Um administrador do grupo ou o suporte entrará em contato em breve!_`, [sender]);
     }
   }
 }

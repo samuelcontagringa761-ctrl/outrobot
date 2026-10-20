@@ -1,10 +1,12 @@
+import { uso, cabecalho, linha } from '../../config/messages.js';
+
 export async function handlePptCommand(sock, msg, args) {
   const from = msg.key.remoteJid;
   const userChoice = args[0]?.toLowerCase();
   const validChoices = ['pedra', 'papel', 'tesoura'];
 
   if (!userChoice || !validChoices.includes(userChoice)) {
-    return sock.sendMessage(from, { text: '⚠️ Escolha entre pedra, papel ou tesoura! Ex: `/ppt pedra`' }, { quoted: msg });
+    return sock.sendMessage(from, { text: uso('/ppt pedra', 'Escolha entre pedra, papel ou tesoura.') }, { quoted: msg });
   }
 
   const botChoice = validChoices[Math.floor(Math.random() * validChoices.length)];
@@ -23,9 +25,9 @@ export async function handlePptCommand(sock, msg, args) {
     resultText = '🤖 *O BOT VENCEU!*';
   }
 
-  const text = `🎮 *PEDRA, PAPEL E TESOURA*\n\n` +
-               `👤 Você escolheu: *${userChoice}*\n` +
-               `🤖 Bot escolheu: *${botChoice}*\n\n` +
+  const text = `${cabecalho('✂️', 'Pedra, Papel e Tesoura')}\n\n` +
+               `${linha('Você escolheu', userChoice)}\n` +
+               `${linha('Bot escolheu', botChoice)}\n\n` +
                `Resultado: ${resultText}`;
 
   return sock.sendMessage(from, { text }, { quoted: msg });

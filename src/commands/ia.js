@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { askAiChat } from '../utils/aiService.js';
+import { aviso, erro, uso } from '../config/messages.js';
 
 function decodeHtml(value) {
   return value
@@ -122,13 +123,13 @@ export async function handleIaCommand(sock, msg, args) {
 
   if (!question) {
     return sock.sendMessage(from, {
-      text: '🔎 *Como usar:* /ia <sua pergunta>\nExemplo: /ia quais foram as principais notícias de tecnologia hoje?'
+      text: uso('/ia <sua pergunta>', 'Exemplo: /ia quais foram as principais notícias de tecnologia hoje?')
     }, { quoted: msg });
   }
 
   if (question.length > 350) {
     return sock.sendMessage(from, {
-      text: '⚠️ A pergunta pode ter no máximo 350 caracteres.'
+      text: aviso('A pergunta pode ter no máximo 350 caracteres.')
     }, { quoted: msg });
   }
 
@@ -166,7 +167,7 @@ export async function handleIaCommand(sock, msg, args) {
   } catch (error) {
     console.error('Erro no comando /ia:', error.message);
     return sock.sendMessage(from, {
-      text: '❌ Não consegui pesquisar ou consultar a IA agora. Tente novamente em alguns instantes.'
+      text: erro('Não consegui pesquisar ou consultar a IA agora. Tente novamente em alguns instantes.')
     }, { quoted: msg });
   }
 }

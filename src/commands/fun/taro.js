@@ -1,4 +1,5 @@
 import { askAi } from '../../utils/aiService.js';
+import { cabecalho, linha } from '../../config/messages.js';
 
 const TAROT_CARDS = [
   'O Louco (0)', 'O Mago (I)', 'A Sacerdotisa (II)', 'A Imperatriz (III)', 'O Imperador (IV)',
@@ -21,7 +22,7 @@ export async function handleTaroCommand(sock, msg, args) {
   const from = msg.key.remoteJid;
   const question = args.join(' ').trim();
 
-  await sock.sendMessage(from, { text: '🃏 *Embaralhando o Baralho Cóptero de Tarô...*' }, { quoted: msg });
+  await sock.sendMessage(from, { text: '🃏 Embaralhando o baralho de tarô...' }, { quoted: msg });
 
   const cards = draw3Cards();
 
@@ -32,23 +33,23 @@ export async function handleTaroCommand(sock, msg, args) {
   try {
     const reading = await askAi(prompt, systemInstruction);
 
-    const resultText = `🔮 *LEITURA DE TARÔ MÍSTICO DA IA* 🔮\n\n` +
-                       `🃏 *Cartas Sorteadas:*\n` +
-                       `1️⃣ *Passado:* ${cards.passado}\n` +
-                       `2️⃣ *Presente:* ${cards.presente}\n` +
-                       `3️⃣ *Futuro:* ${cards.futuro}\n\n` +
-                       `❓ *Consulta:* ${question ? `"${question}"` : '_Visão geral da vida_'}\n\n` +
-                       `✨ *Interpretação Oracular:*\n\n${reading}`;
+    const resultText = `${cabecalho('🔮', 'Leitura de Tarô Místico da IA')}\n\n` +
+                       `🃏 Cartas sorteadas:\n` +
+                       `1️⃣ Passado: *${cards.passado}*\n` +
+                       `2️⃣ Presente: *${cards.presente}*\n` +
+                       `3️⃣ Futuro: *${cards.futuro}*\n\n` +
+                       `${linha('Consulta', question ? `"${question}"` : '_Visão geral da vida_')}\n\n` +
+                       `✨ Interpretação oracular:\n\n${reading}`;
 
     return sock.sendMessage(from, { text: resultText }, { quoted: msg });
   } catch (err) {
     console.error('Erro no comando /taro:', err.message);
-    const fallbackText = `🔮 *LEITURA DE TARÔ MÍSTICO* 🔮\n\n` +
-                         `🃏 *Cartas Sorteadas:*\n` +
-                         `1️⃣ *Passado:* ${cards.passado}\n` +
-                         `2️⃣ *Presente:* ${cards.presente}\n` +
-                         `3️⃣ *Futuro:* ${cards.futuro}\n\n` +
-                         `✨ *Visão:* O passado trouxe aprendizados com ${cards.passado}. O presente exige atenção com ${cards.presente}, e o futuro promete caminhos com ${cards.futuro}!`;
+    const fallbackText = `${cabecalho('🔮', 'Leitura de Tarô Místico')}\n\n` +
+                         `🃏 Cartas sorteadas:\n` +
+                         `1️⃣ Passado: *${cards.passado}*\n` +
+                         `2️⃣ Presente: *${cards.presente}*\n` +
+                         `3️⃣ Futuro: *${cards.futuro}*\n\n` +
+                         `✨ Visão: o passado trouxe aprendizados com *${cards.passado}*, o presente exige atenção com *${cards.presente}* e o futuro promete caminhos com *${cards.futuro}*!`;
     return sock.sendMessage(from, { text: fallbackText }, { quoted: msg });
   }
 }

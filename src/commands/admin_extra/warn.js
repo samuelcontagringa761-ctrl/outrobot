@@ -1,26 +1,27 @@
 import { checkIfOwner, isAdmin, isBotAdmin, isPhoneJid, resolveActionTarget } from '../admin.js';
 import { addWarn, getWarns, resetWarns } from '../../database/sqlite.js';
+import { grupoApenas, adminOuDonoApenas, marcaAlguem, aviso, sucesso, linha } from '../../config/messages.js';
 
 export async function handleWarnCommand(sock, msg, args, sender, mentioned) {
   const from = msg.key.remoteJid;
   if (!from.endsWith('@g.us')) {
-    return sock.sendMessage(from, { text: '⚠️ Este comando só pode ser utilizado em grupos.' }, { quoted: msg });
+    return sock.sendMessage(from, { text: grupoApenas() }, { quoted: msg });
   }
 
   const groupMetadata = await sock.groupMetadata(from);
   const participants = groupMetadata.participants;
 
   if (!isAdmin(participants, sender) && !checkIfOwner(sender)) {
-    return sock.sendMessage(from, { text: '⚠️ Apenas administradores do grupo ou o dono do bot podem aplicar advertências.' }, { quoted: msg });
+    return sock.sendMessage(from, { text: adminOuDonoApenas() }, { quoted: msg });
   }
 
   let target = mentioned[0] || msg.message?.extendedTextMessage?.contextInfo?.participant;
   if (!target) {
-    return sock.sendMessage(from, { text: '⚠️ Marque alguém ou responda à mensagem da pessoa que deseja advertir.' }, { quoted: msg });
+    return sock.sendMessage(from, { text: marcaAlguem() }, { quoted: msg });
   }
 
   if (isPhoneJid(target) && checkIfOwner(target)) {
-    return sock.sendMessage(from, { text: '⚠️ Não é possível advertir o dono do bot!' }, { quoted: msg });
+    return sock.sendMessage(from, { text: aviso('Não é possível advertir o dono do bot!') }, { quoted: msg });
   }
 
   const count = addWarn(from, target);
@@ -37,7 +38,7 @@ export async function handleWarnCommand(sock, msg, args, sender, mentioned) {
         }
         await sock.groupParticipantsUpdate(from, [actionJid], 'remove');
         return sock.sendMessage(from, { 
-          text: `⚠️ @${actionJid.split('@')[0]} atingiu ${MAX_WARNS}/${MAX_WARNS} advertências e foi removido do grupo!`,
+          text: sucesso(`@${actionJid.split('@')[0]} atingiu *${MAX_WARNS}/${MAX_WARNS}* advertências e foi removido do grupo.`),
           mentions: [actionJid]
         }, { quoted: msg });
       } catch (err) {
@@ -45,13 +46,13 @@ export async function handleWarnCommand(sock, msg, args, sender, mentioned) {
       }
     }
     return sock.sendMessage(from, { 
-      text: `⚠️ @${target.split('@')[0]} atingiu ${MAX_WARNS}/${MAX_WARNS} advertências! (Não tenho permissão de adm para remover).`,
+      text: aviso(`@${target.split('@')[0]} atingiu *${MAX_WARNS}/${MAX_WARNS}* advertências, mas não tenho permissão para removê-lo.`),
       mentions: [target]
     }, { quoted: msg });
   }
 
   return sock.sendMessage(from, { 
-    text: `⚠️ @${target.split('@')[0]} recebeu uma advertência!\n\n📌 *Total:* ${count}/${MAX_WARNS}`,
+    text: `${sucesso(`@${target.split('@')[0]} recebeu uma advertência.`)}\n\n${linha('Total', `${count}/${MAX_WARNS}`)}`,
     mentions: [target]
   }, { quoted: msg });
 }
