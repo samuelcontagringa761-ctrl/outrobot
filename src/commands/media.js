@@ -204,6 +204,57 @@ export async function convertImageToStickerSized(inputPath, mode) {
   return buffer;
 }
 
+// Converte áudio (mp3) para M4A/AAC. O WhatsApp usa AAC dentro de MP4 como
+// formato nativo — é o que toca em qualquer aparelho, inclusive iPhone.
+export function convertToM4a(inputPath) {
+  const outputPath = path.join(os.tmpdir(), `wa-audio-${Date.now()}-${Math.floor(Math.random() * 1e6)}.m4a`);
+  return new Promise((resolve, reject) => {
+    execFile(ffmpegPath, [
+      '-y',
+      '-i', inputPath,
+      '-vn',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-ar', '44100',
+      '-ac', '2',
+      '-movflags', '+faststart',
+      outputPath
+    ], (err) => (err ? reject(err) : resolve(outputPath)));
+  });
+}
+
+// Envia áudio como mensagem NATIVA do WhatsApp.
+// Antes o bot enviava MP3 com mimetype 'audio/mp4' (mp3 rotulado de mp4) —
+// o Android às vezes tolera, o iPhone não toca. Agora o arquivo real é M4A/AAC
+// com 'audio/mp4'; se a conversão falhar, envia mp3 com 'audio/mpeg' (coerente).
+export async function sendAudioCompat(sock, from, filePath, title, quotedMsg) {
+  const safeTitle = String(title || 'audio').replace(/[\\/:*?"<>|\n\r]+/g, ' ').trim().slice(0, 60) || 'audio';
+  let caminho = filePath;
+  let mimetype = 'audio/mpeg';
+  let fileName = `${safeTitle}.mp3`;
+
+  try {
+    caminho = await convertToM4a(filePath);
+    mimetype = 'audio/mp4';
+    fileName = `${safeTitle}.m4a`;
+  } catch (err) {
+    console.warn(`⚠️ Conversão para m4a falhou, enviando mp3: ${err.message?.slice(0, 100)}`);
+  }
+
+  try {
+    await sock.sendMessage(from, {
+      audio: fs.readFileSync(caminho),
+      mimetype,
+      fileName,
+      ptt: false
+    }, { quoted: quotedMsg });
+  } finally {
+    if (caminho !== filePath && fs.existsSync(caminho)) {
+      try { fs.unlinkSync(caminho); } catch (_) {}
+    }
+  }
+}
+
 export async function handleMediaCommands(sock, msg, command, args, sender) {
   const from = msg.key.remoteJid;
   const reply = async (text) => {
@@ -499,15 +550,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         let music;
         try {
           music = await downloadTiktokAudio(query);
-          await sock.sendMessage(
-            from, 
-            { 
-              audio: fs.readFileSync(music.filePath), 
-              mimetype: 'audio/mp4', 
-              fileName: `${music.title}.mp3` 
-            }, 
-            { quoted: msg }
-          );
+          await sendAudioCompat(sock, from, music.filePath, music.title, msg);
           return;
         } catch (error) {
           console.error('Erro ao baixar áudio do TikTok via /play:', error);
@@ -525,15 +568,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
         let music;
         try {
           music = await downloadInstagramAudio(query);
-          await sock.sendMessage(
-            from, 
-            { 
-              audio: fs.readFileSync(music.filePath), 
-              mimetype: 'audio/mp4', 
-              fileName: `${music.title}.mp3` 
-            }, 
-            { quoted: msg }
-          );
+          await sendAudioCompat(sock, from, music.filePath, music.title, msg);
           return;
         } catch (error) {
           console.error('Erro ao baixar áudio do Instagram via /play:', error);
@@ -551,15 +586,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
       try {
         music = await downloadYoutubeAudio(query);
 
-        await sock.sendMessage(
-          from, 
-          { 
-            audio: fs.readFileSync(music.filePath), 
-            mimetype: 'audio/mp4', 
-            fileName: `${music.title}.mp3` 
-          }, 
-          { quoted: msg }
-        );
+        await sendAudioCompat(sock, from, music.filePath, music.title, msg);
       } catch (error) {
         console.error('Erro ao baixar música:', error);
         const detail = error?.message ? ` (${error.message.slice(0, 100)})` : '';
@@ -686,15 +713,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
 
       try {
         const music = await downloadInstagramAudio(url);
-        await sock.sendMessage(
-          from, 
-          { 
-            audio: { url: music.filePath }, 
-            mimetype: 'audio/mp4', 
-            fileName: `${music.title}.mp3` 
-          }, 
-          { quoted: msg }
-        );
+        await sendAudioCompat(sock, from, music.filePath, music.title, msg);
         fs.unlinkSync(music.filePath);
       } catch (error) {
         console.error('Erro ao baixar áudio do Instagram:', error);
@@ -742,15 +761,7 @@ export async function handleMediaCommands(sock, msg, command, args, sender) {
 
       try {
         const music = await downloadTiktokAudio(url);
-        await sock.sendMessage(
-          from, 
-          { 
-            audio: { url: music.filePath }, 
-            mimetype: 'audio/mp4', 
-            fileName: `${music.title}.mp3` 
-          }, 
-          { quoted: msg }
-        );
+        await sendAudioCompat(sock, from, music.filePath, music.title, msg);
         fs.unlinkSync(music.filePath);
       } catch (error) {
         console.error('Erro ao baixar áudio do TikTok:', error);
