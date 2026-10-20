@@ -18,7 +18,7 @@ function resolveDataDir() {
 export const DATA_DIR = resolveDataDir();
 export const IS_PERSISTENT = DATA_DIR !== PROJECT_ROOT;
 
-const DATA_FILES = ['bot_data.sqlite', 'bot_data.json', 'database.json', 'user_facts.json', 'cookies.txt'];
+const DATA_FILES = ['bot_data.sqlite', 'bot_data.json', 'database.json', 'user_facts.json', 'ia_history.json', 'cookies.txt'];
 const DATA_DIRS = ['session', 'backups'];
 
 export function dataPath(name) {

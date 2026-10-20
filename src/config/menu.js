@@ -31,7 +31,7 @@ export const CATEGORIAS = [
     emoji: '🤖',
     titulo: 'INTELIGÊNCIA ARTIFICIAL',
     comandos: [
-      ['ia <pergunta>', 'Pesquisar na internet e responder com fontes'],
+      ['ia <pergunta>', 'Pesquisar na internet e responder, lembrando o fio da conversa'],
     ],
   },
   {
