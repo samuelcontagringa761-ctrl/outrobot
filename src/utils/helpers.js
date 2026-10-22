@@ -62,11 +62,18 @@ async function discoverPipedInstances() {
   return [];
 }
 
+// Última instância que funcionou: vai na frente nas próximas tentativas.
+let basePipedBoa = null;
+
 async function getPipedBases() {
   const discovered = await discoverPipedInstances();
   const merged = [...discovered];
   for (const b of PIPED_INSTANCES) {
     if (!merged.includes(b)) merged.push(b);
+  }
+  if (basePipedBoa) {
+    const semRepetir = merged.filter((b) => b !== basePipedBoa);
+    return [basePipedBoa, ...semRepetir];
   }
   return merged;
 }
@@ -95,6 +102,13 @@ const INVIDIOUS_INSTANCES = (process.env.INVIDIOUS_INSTANCES
 // Se a instância exigir autenticação, defina também COBALT_API_KEY.
 const COBALT_API_URL = (process.env.COBALT_API_URL || '').trim().replace(/\/$/, '');
 const COBALT_API_KEY = (process.env.COBALT_API_KEY || '').trim();
+
+// Provider de PO Token (bgutil). Em 2026 o YouTube exige prova de origem para
+// vários clientes; sem isso o cookie morre rápido e vem "Sign in to confirm
+// you're not a bot". O plugin já vem instalado na imagem; aqui só apontamos
+// para o servidor, quando existir (ex: http://127.0.0.1:4416).
+const POT_PROVIDER_URL = (process.env.POT_PROVIDER_URL || '').trim().replace(/\/$/, '');
+
 
 function extractVideoId(input) {
   const m = String(input || '').match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|v\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
@@ -368,12 +382,19 @@ function buildBaseArgs(withCookies = true, clientOverride = null) {
     console.log('[yt-dlp] Usando cookies autenticados do YouTube.');
   }
 
+  // PO Token: só quando o servidor do provider estiver configurado.
+  if (POT_PROVIDER_URL) {
+    args.push('--extractor-args', `youtubepot-bgutilhttp:base_url=${POT_PROVIDER_URL}`);
+    args.push('--extractor-args', 'youtube:fetch_pot=always');
+  }
+
   return args;
 }
 
-// Executa o download com retentativas. Ordem segue a recomendação atual do
-// yt-dlp (2026): clientes tv/web_safari funcionam sem credenciais na maioria
-// dos casos; android/ios exigem PO Token e podem falhar em datacenter.
+// Executa o download com retentativas.
+// Ordem testada em 2026: os clientes tv/android_vr/ios devolvem "page needs to
+// be reloaded" ou 403 sem PO Token, então só desperdiçam tempo. tv_simply e
+// mweb são os que ainda entregam áudio sem credenciais.
 async function downloadWithYtDlp(url, specificArgs) {
   const attempts = [];
   const hasCookies = checkValidCookies();
@@ -381,33 +402,39 @@ async function downloadWithYtDlp(url, specificArgs) {
   // Com cookies REAIS válidos, tenta PRIMEIRO: sem cookies o YouTube
   // bloqueia o IP do servidor, então começar pelas tentativas "sem cookies"
   // só gasta tempo (e enche o log de erros) antes de chegar na que funciona.
-  // Usa web_safari/mweb: cookies + client "tv" invalidam a sessão.
   if (hasCookies) {
     attempts.push({ name: 'web_safari + cookies', withCookies: true, client: 'web_safari' });
     attempts.push({ name: 'mweb + cookies', withCookies: true, client: 'mweb' });
+    attempts.push({ name: 'tv_simply + cookies', withCookies: true, client: 'tv_simply' });
     attempts.push({ name: 'padrao + cookies', withCookies: true, client: null });
   }
 
-  // Sem cookies (ou como reserva, se os cookies expirarem): clientes menos
-  // inspecionados primeiro. "tv,web_safari" numa única tentativa = yt-dlp
-  // tenta os dois em ordem.
-  attempts.push({ name: 'tv+web_safari (sem cookies)', withCookies: false, client: 'tv,web_safari' });
-  attempts.push({ name: 'android_vr (sem cookies)', withCookies: false, client: 'android_vr' });
+  // Sem cookies (ou como reserva, se os cookies expirarem).
+  attempts.push({ name: 'tv_simply (sem cookies)', withCookies: false, client: 'tv_simply' });
   attempts.push({ name: 'mweb (sem cookies)', withCookies: false, client: 'mweb' });
-  attempts.push({ name: 'ios (sem cookies)', withCookies: false, client: 'ios' });
-  attempts.push({ name: 'android (sem cookies)', withCookies: false, client: 'android' });
   attempts.push({ name: 'padrao (sem cookies)', withCookies: false, client: null });
+  attempts.push({ name: 'web_safari (sem cookies)', withCookies: false, client: 'web_safari' });
 
   let lastError = null;
+  let cookiesInvalidos = false;
 
   for (let i = 0; i < attempts.length; i++) {
     const attempt = attempts[i];
+
+    // Cookies mortos: não adianta repetir os 4 clientes com o mesmo cookie.
+    if (attempt.withCookies && cookiesInvalidos) continue;
+
     try {
       const args = [url, ...buildBaseArgs(attempt.withCookies, attempt.client), ...specificArgs];
       return await runYtDlpExecFile(args);
     } catch (err) {
       lastError = err;
       console.warn(`⚠️ Tentativa ${i + 1} (${attempt.name}) falhou: ${err.message?.slice(0, 120)}`);
+
+      if (attempt.withCookies && /cookies are no longer valid|Sign in to confirm|Please sign in/i.test(err.message || '')) {
+        cookiesInvalidos = true;
+        console.warn('[yt-dlp] ⚠️ Cookies inválidos/expirados — seguindo sem cookies.');
+      }
     }
   }
 
@@ -649,59 +676,153 @@ function convertToMp3(inputPath, outputPath) {
   });
 }
 
-// Fallback 1: baixa áudio/vídeo via Piped (backend fora do IP bloqueado)
+// Junta vídeo e áudio separados (streams "videoOnly" do Piped) num mp4.
+function muxVideoAudio(videoPath, audioPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const bin = (ffmpegPath && fs.existsSync(ffmpegPath)) ? ffmpegPath : 'ffmpeg';
+    execFile(
+      bin,
+      ['-y', '-i', videoPath, '-i', audioPath, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-shortest', outputPath],
+      (err) => (err ? reject(err) : resolve(outputPath))
+    );
+  });
+}
+
+// Streams de áudio utilizáveis, preferindo os proxiados pela instância
+// (URLs googlevideo podem estar presas ao IP da instância e dar 403).
+function streamsDeAudio(data) {
+  return (data?.audioStreams || [])
+    .filter((s) => s?.url && isUsableStreamUrl(s.url))
+    .sort((a, b) => {
+      const proxiado = (u) => (/googlevideo\.com/i.test(u) ? 0 : 1);
+      const dif = proxiado(b.url) - proxiado(a.url);
+      return dif !== 0 ? dif : (b.bitrate || 0) - (a.bitrate || 0);
+    });
+}
+
+// Streams de vídeo mp4, preferindo progressivo (com áudio embutido).
+function streamsDeVideo(data) {
+  const todos = (data?.videoStreams || []).filter((s) => s?.url && isUsableStreamUrl(s.url));
+  const progressivos = todos.filter((s) => s.videoOnly === false && (s.mimeType || '').includes('mp4'));
+  const pool = progressivos.length ? progressivos : todos.filter((s) => (s.mimeType || '').includes('mp4'));
+  return pool.sort((a, b) => (a.height || 0) - (b.height || 0));
+}
+
+async function baixarAudioViaPiped(data, base) {
+  let lastErr = null;
+  for (const stream of streamsDeAudio(data)) {
+    const rawTmp = path.join(os.tmpdir(), `piped-raw-${Date.now()}.tmp`);
+    const mp3Tmp = path.join(os.tmpdir(), `yt-audio-${Date.now()}.mp3`);
+    try {
+      await downloadStreamToFile(stream.url, rawTmp, base);
+      try {
+        await convertToMp3(rawTmp, mp3Tmp);
+        try { fs.unlinkSync(rawTmp); } catch (_) {}
+      } catch (_) {
+        fs.renameSync(rawTmp, mp3Tmp);
+      }
+      return mp3Tmp;
+    } catch (err) {
+      lastErr = err;
+      try { fs.unlinkSync(rawTmp); } catch (_) {}
+    }
+  }
+  throw lastErr || new Error('nenhum stream de áudio pôde ser baixado');
+}
+
+async function baixarVideoViaPiped(data, base) {
+  let lastErr = null;
+  const audio = streamsDeAudio(data)[0];
+
+  for (const stream of streamsDeVideo(data)) {
+    const tmpFile = path.join(os.tmpdir(), `yt-video-${Date.now()}.mp4`);
+    try {
+      await downloadStreamToFile(stream.url, tmpFile, base);
+
+      // Stream "videoOnly": baixa o áudio e junta, senão o vídeo sai mudo.
+      if (stream.videoOnly === true && audio) {
+        const audioTmp = path.join(os.tmpdir(), `piped-audio-${Date.now()}.tmp`);
+        const muxed = path.join(os.tmpdir(), `yt-video-mux-${Date.now()}.mp4`);
+        await downloadStreamToFile(audio.url, audioTmp, base);
+        await muxVideoAudio(tmpFile, audioTmp, muxed);
+        try { fs.unlinkSync(tmpFile); fs.unlinkSync(audioTmp); } catch (_) {}
+        return muxed;
+      }
+
+      return tmpFile;
+    } catch (err) {
+      lastErr = err;
+      try { fs.unlinkSync(tmpFile); } catch (_) {}
+    }
+  }
+  throw lastErr || new Error('nenhum stream de vídeo pôde ser baixado');
+}
+
+// Fallback 1: baixa áudio/vídeo via Piped (backend fora do IP bloqueado).
+// As instâncias são testadas em lotes paralelos: instâncias mortas antes
+// custavam 15s cada, agora custam no máximo 6s por lote.
 async function downloadViaPiped(info, kind = 'audio') {
   const videoId = info.videoId || extractVideoId(info.url);
   if (!videoId) throw new Error('Piped: sem videoId');
-  let lastErr = null;
-  for (const base of await getPipedBases()) {
-    try {
-      const res = await axios.get(`${base}/streams/${videoId}`, { timeout: 15000 });
-      const data = res.data;
-      if (!data) continue;
 
-      if (kind === 'audio') {
-        const streams = (data.audioStreams || []).filter((s) => isUsableStreamUrl(s?.url));
-        if (!streams.length) {
-          lastErr = new Error('sem audioStreams utilizáveis (só espelho LBRY?)');
-          continue; // tenta a próxima instância em vez de baixar lixo
-        }
-        // Prefere m4a/opus de maior bitrate
-        streams.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-        const best = streams[0];
-        const rawTmp = path.join(os.tmpdir(), `piped-raw-${Date.now()}.tmp`);
-        await downloadStreamToFile(best.url, rawTmp, base);
-        const mp3Tmp = path.join(os.tmpdir(), `yt-audio-${Date.now()}.mp3`);
+  const bases = await getPipedBases();
+  let lastErr = null;
+
+  for (let i = 0; i < bases.length; i += 4) {
+    const lote = bases.slice(i, i + 4);
+    const respostas = await Promise.all(
+      lote.map(async (base) => {
         try {
-          await convertToMp3(rawTmp, mp3Tmp);
-          try { fs.unlinkSync(rawTmp); } catch (_) {}
-        } catch (_) {
-          fs.renameSync(rawTmp, mp3Tmp);
+          const res = await axios.get(`${base}/streams/${videoId}`, { timeout: 6000 });
+          return { base, data: res.data };
+        } catch (err) {
+          return { base, erro: err };
         }
-        console.log(`[download] ✅ Áudio via Piped (${base})`);
-        return { filePath: mp3Tmp, title: data.title || info.title, duration: info.duration, views: data.views ?? info.views, author: data.uploader || info.author, url: info.url };
+      })
+    );
+
+    for (const resposta of respostas) {
+      if (!resposta.data) {
+        lastErr = resposta.erro;
+        console.warn(`⚠️ Piped ${resposta.base} falhou: ${resposta.erro?.message?.slice(0, 80)}`);
+        continue;
       }
 
-      // vídeo: prefere stream progressivo (áudio+vídeo) mp4 <= 720p
-      const progressive = (data.videoStreams || []).filter((s) => s?.url && s.videoOnly === false && isUsableStreamUrl(s.url));
-      const pool = progressive.length ? progressive : (data.videoStreams || []).filter((s) => isUsableStreamUrl(s?.url));
-      if (!pool.length) {
+      const { base, data } = resposta;
+      const audio = streamsDeAudio(data);
+      const video = streamsDeVideo(data);
+
+      if (kind === 'audio' && !audio.length) {
+        lastErr = new Error('sem audioStreams utilizáveis (só espelho LBRY?)');
+        continue;
+      }
+      if (kind === 'video' && !video.length) {
         lastErr = new Error('sem videoStreams utilizáveis (só espelho LBRY?)');
         continue;
       }
-      const mp4s = pool.filter((s) => (s.mimeType || '').includes('mp4'));
-      const candidates = mp4s.length ? mp4s : pool;
-      candidates.sort((a, b) => (a.height || 0) - (b.height || 0));
-      const picked = [...candidates].reverse().find((s) => (s.height || 9999) <= 720) || candidates[candidates.length - 1];
-      const tmpFile = path.join(os.tmpdir(), `yt-video-${Date.now()}.mp4`);
-      await downloadStreamToFile(picked.url, tmpFile, base);
-      console.log(`[download] ✅ Vídeo via Piped (${base})`);
-      return { filePath: tmpFile, title: data.title || info.title, duration: info.duration, views: data.views ?? info.views, author: data.uploader || info.author, url: info.url };
-    } catch (err) {
-      lastErr = err;
-      console.warn(`⚠️ Piped ${base} falhou: ${err.message?.slice(0, 100)}`);
+
+      try {
+        const filePath = kind === 'audio'
+          ? await baixarAudioViaPiped(data, base)
+          : await baixarVideoViaPiped(data, base);
+
+        basePipedBoa = base;
+        console.log(`[download] ✅ ${kind === 'audio' ? 'Áudio' : 'Vídeo'} via Piped (${base})`);
+        return {
+          filePath,
+          title: data.title || info.title,
+          duration: info.duration,
+          views: data.views ?? info.views,
+          author: data.uploader || info.author,
+          url: info.url
+        };
+      } catch (err) {
+        lastErr = err;
+        console.warn(`⚠️ Piped ${base} respondeu, mas o download falhou: ${err.message?.slice(0, 100)}`);
+      }
     }
   }
+
   throw lastErr || new Error('Piped: todas as instâncias falharam');
 }
 
