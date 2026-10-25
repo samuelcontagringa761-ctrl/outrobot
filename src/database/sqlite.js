@@ -92,6 +92,10 @@ export function getPendingReminders() {
   return databaseManager.getPendingReminders();
 }
 
+export function listReminders(userJid, chatJid) {
+  return databaseManager.listReminders(userJid, chatJid);
+}
+
 export async function deleteReminder(id) {
   return await databaseManager.deleteReminder(id);
 }

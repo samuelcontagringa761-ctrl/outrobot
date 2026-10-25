@@ -10,6 +10,8 @@ import { getUser, updateUser, getGroupConfig } from './database/sqlite.js';
 import { formatUptime } from './utils/helpers.js';
 import { calculateBonusRewards } from './utils/bonusCalculator.js';
 import { buildMenu } from './config/menu.js';
+import { handleSeihaCommands } from './commands/seiha/index.js';
+import { activeSimulados, processSimuladoAnswer } from './commands/seiha/simulado.js';
 import { erroInterno, BOT_NAME } from './config/messages.js';
 import dotenv from 'dotenv';
 
@@ -302,6 +304,11 @@ export async function handleMessages(rawSock, msg) {
   if (body && !msg.key.fromMe) {
     const isMenu = body.toLowerCase().startsWith(prefix + 'menu');
     if (!isMenu) {
+      if (activeSimulados.has(from)) {
+        const handled = await processSimuladoAnswer(sock, msg, from, body.trim(), sender);
+        if (handled) return;
+      }
+
       if (activeForcaGames.has(from)) {
         const isForcaCmd = body.toLowerCase().startsWith(prefix + 'forca');
         const guess = isForcaCmd ? body.slice((prefix + 'forca').length).trim() : body.trim();
@@ -386,6 +393,12 @@ export async function handleMessages(rawSock, msg) {
   console.log(`[COMANDO] ${command} executado por ${sender} no chat ${from}`);
 
   try {
+    if (await handleSeihaCommands({
+      sock, msg, command, args, sender, mentioned, from, isGroup, prefix
+    })) {
+      return;
+    }
+
     if (['menu', 'help', 'bot'].includes(command)) {
       const uptimeSeconds = (Date.now() - (global.botStartTime || Date.now())) / 1000;
       const uptimeStr = formatUptime(uptimeSeconds);

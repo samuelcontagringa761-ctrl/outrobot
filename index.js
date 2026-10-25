@@ -10,6 +10,7 @@ import { initSqlite } from './src/database/sqlite.js';
 import { ensureDataDir, SESSION_DIR, IS_PERSISTENT, DATA_DIR } from './src/config/paths.js';
 import { criarCacheDeTentativas, instalarFiltroDeRuidoDeSessao, criarRegistradorDeFalhas } from './src/utils/sessionTools.js';
 import { handleMessages } from './src/messageHandler.js';
+import { startReminderScheduler } from './src/commands/seiha/lembrete.js';
 import queueManager from './src/queue/QueueManager.js';
 
 // Cache global de tentativas de retry para evitar loops de mensagens não descriptografadas.
@@ -167,6 +168,8 @@ async function startBot() {
       console.log('║ Digite os comandos no WhatsApp para    ║');
       console.log('║ interagir com o bot.                   ║');
       console.log('╚════════════════════════════════════════╝\n');
+
+      startReminderScheduler(sock);
     }
   });
 

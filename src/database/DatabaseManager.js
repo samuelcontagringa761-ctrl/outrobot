@@ -1212,6 +1212,12 @@ class DatabaseManager {
     return this.memoryStore.reminders.filter(r => r.target_time <= now);
   }
 
+  listReminders(userJid, chatJid) {
+    return this.memoryStore.reminders
+      .filter(r => r.user_jid === userJid && (!chatJid || r.chat_jid === chatJid))
+      .sort((a, b) => Number(a.target_time) - Number(b.target_time));
+  }
+
   async deleteReminder(id) {
     const numId = Number(id);
     this.memoryStore.reminders = this.memoryStore.reminders.filter(r => Number(r.id) !== numId);

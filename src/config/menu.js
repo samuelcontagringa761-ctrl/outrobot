@@ -35,6 +35,22 @@ export const CATEGORIAS = [
     ],
   },
   {
+    emoji: '🎓',
+    titulo: 'ESTUDO & FAMÍLIA',
+    comandos: [
+      ['estudo <tema>', 'Explicar um assunto de escola ou curiosidade'],
+      ['redacao <texto>', 'Corrigir redação no padrão ENEM'],
+      ['simulado', 'Responder 5 perguntas valendo XP'],
+      ['quiz anime', 'Quiz de anime, com perguntas do Shiunji'],
+      ['familia', 'Ver a família Shiunji do grupo'],
+      ['familia entrar', 'Entrar na família e receber um papel'],
+      ['familia sair', 'Sair da família'],
+      ['rank [xp|moedas|aura]', 'Ver o quadro de honra'],
+      ['omiai @pessoa', 'Encontro arranjado com carta da Seiha'],
+      ['heranca', 'Disputar a herança mensal por XP'],
+    ],
+  },
+  {
     emoji: '⚔️',
     titulo: 'RPG & BATALHAS',
     comandos: [
@@ -119,6 +135,8 @@ export const CATEGORIAS = [
       ['qrcode <texto ou link>', 'Gerar a imagem de um QR Code'],
       ['readqr', 'Ler o QR Code de uma imagem enviada'],
       ['cep <número>', 'Buscar o endereço de um CEP'],
+      ['lembrete <tempo> <texto>', 'Ser avisado depois (ex: 10m, 2h, 18:30)'],
+      ['lembretes', 'Ver e cancelar seus lembretes'],
       ['fila', 'Ver o status da fila de comandos'],
       ['ping', 'Medir o tempo de resposta'],
       ['uptime', 'Ver há quanto tempo o bot está online'],

@@ -2,6 +2,7 @@ import { getUser, updateUser } from '../../database/sqlite.js';
 import { askAi } from '../../utils/aiService.js';
 import { calculateBonusRewards } from '../../utils/bonusCalculator.js';
 import { cabecalho, linha, info } from '../../config/messages.js';
+import { animeQuizQuestions } from './animeQuizData.js';
 
 const fallbackQuestions = [
   { question: 'Qual o maior planeta do Sistema Solar?', answer: 'júpiter', altAnswers: ['jupiter'], options: ['Terra', 'Júpiter', 'Saturno', 'Marte'] },
@@ -24,6 +25,7 @@ function normalizeString(str) {
 export async function handleQuizCommand(sock, msg, args, sender) {
   const from = msg.key.remoteJid;
   const inputArg = args.join(' ').trim();
+  const modoAnime = inputArg.toLowerCase() === 'anime';
 
   if (['reset', 'novo', 'reiniciar', 'cancelar'].includes(inputArg.toLowerCase())) {
     activeQuizGames.delete(from);
@@ -32,21 +34,30 @@ export async function handleQuizCommand(sock, msg, args, sender) {
 
   const activeQuiz = activeQuizGames.get(from);
 
+  // /quiz anime tem banco próprio, sem gastar chamada de IA.
+  if (modoAnime) {
+    if (activeQuiz) return mostrarQuizAtual(sock, msg, from, activeQuiz);
+    return startNewAnimeQuiz(sock, msg, from);
+  }
+
   // Se o usuário tentou responder via comando (ex: /quiz jupiter)
   if (activeQuiz && inputArg.length > 0) {
     const answered = await processQuizAnswer(sock, msg, from, inputArg, sender);
     if (answered) return;
   }
 
-  if (activeQuiz) {
-    const text = `${cabecalho('🧠', 'Quiz em Andamento')}\n\n` +
-                 `${linha('Pergunta', activeQuiz.question)}\n\n` +
-                 `${linha('Opções', activeQuiz.options.join(', '))}\n\n` +
-                 `👉 Digite a resposta correta no chat!`;
-    return sock.sendMessage(from, { text }, { quoted: msg });
-  }
+  if (activeQuiz) return mostrarQuizAtual(sock, msg, from, activeQuiz);
 
   return startNewAiQuiz(sock, msg, from);
+}
+
+function mostrarQuizAtual(sock, msg, from, activeQuiz) {
+  const anime = activeQuiz.tema === 'anime';
+  const text = `${cabecalho(anime ? '🎌' : '🧠', anime ? 'Quiz Anime em Andamento' : 'Quiz em Andamento')}\n\n` +
+               `${linha('Pergunta', activeQuiz.question)}\n\n` +
+               `${linha('Opções', activeQuiz.options.join(', '))}\n\n` +
+               `👉 Digite a resposta correta no chat!`;
+  return sock.sendMessage(from, { text }, { quoted: msg });
 }
 
 async function generateAiQuestion() {
@@ -83,13 +94,48 @@ async function startNewAiQuiz(sock, msg, from) {
     question: q.question,
     answer: q.answer,
     altAnswers: q.altAnswers || [],
-    options: q.options
+    options: q.options,
+    rewardCoins: 200,
+    rewardXp: 50,
+    tema: 'geral'
   });
 
   const text = `${cabecalho('🧠', 'Quiz de IA Inédito')}\n\n` +
                `${linha('Pergunta', q.question)}\n\n` +
                `${linha('Opções', q.options.join(', '))}\n\n` +
                `${info('Responda diretamente no chat! Prêmio: *+50 XP* e *+$200* de bônus.')}`;
+
+  return sock.sendMessage(from, { text }, { quoted: msg });
+}
+
+// Evita repetir a mesma pergunta de anime em duas rodadas seguidas.
+let ultimaPerguntaAnime = null;
+
+function sortearPerguntaAnime() {
+  const disponiveis = animeQuizQuestions.filter((q) => q.question !== ultimaPerguntaAnime);
+  const banco = disponiveis.length ? disponiveis : animeQuizQuestions;
+  const escolhida = banco[Math.floor(Math.random() * banco.length)];
+  ultimaPerguntaAnime = escolhida.question;
+  return escolhida;
+}
+
+function startNewAnimeQuiz(sock, msg, from) {
+  const q = sortearPerguntaAnime();
+
+  activeQuizGames.set(from, {
+    question: q.question,
+    answer: q.answer,
+    altAnswers: q.altAnswers || [],
+    options: q.options,
+    rewardCoins: 100,
+    rewardXp: 30,
+    tema: 'anime'
+  });
+
+  const text = `${cabecalho('🎌', 'Quiz Anime')}\n\n` +
+               `${linha('Pergunta', q.question)}\n\n` +
+               `${linha('Opções', q.options.join(', '))}\n\n` +
+               `${info('Responda diretamente no chat! Prêmio: *+30 XP* e *+$100*.')}`;
 
   return sock.sendMessage(from, { text }, { quoted: msg });
 }
@@ -112,8 +158,10 @@ export async function processQuizAnswer(sock, msg, from, userResponse, sender) {
     activeQuizGames.delete(from);
 
     // Recompensa o jogador com moedas e XP no banco unificado com bônus aplicados
+    const baseCoins = Number(activeQuiz.rewardCoins ?? 200);
+    const baseXp = Number(activeQuiz.rewardXp ?? 50);
     const userObj = getUser(sender);
-    const { finalCoins: rewardCoins, finalXp: rewardXp, bonusCoinsApplied, bonusXpApplied } = calculateBonusRewards(userObj, 200, 50, 'quiz');
+    const { finalCoins: rewardCoins, finalXp: rewardXp, bonusCoinsApplied, bonusXpApplied } = calculateBonusRewards(userObj, baseCoins, baseXp, 'quiz');
 
     updateUser(sender, {
       wallet: userObj.wallet + rewardCoins,
@@ -121,8 +169,9 @@ export async function processQuizAnswer(sock, msg, from, userResponse, sender) {
     });
 
     const bonusStr = (bonusCoinsApplied > 0 || bonusXpApplied > 0) ? ` *(com bônus de classe/evento!)*` : '';
+    const anime = activeQuiz.tema === 'anime';
 
-    const text = `${cabecalho('🎉', 'Resposta Correta!')} @${sender.split('@')[0]} acertou em cheio!\n\n` +
+    const text = `${cabecalho(anime ? '🎌' : '🎉', anime ? 'Quiz Anime — Acertou!' : 'Resposta Correta!')} @${sender.split('@')[0]} acertou em cheio!\n\n` +
                  `${linha('Pergunta', activeQuiz.question)}\n` +
                  `${linha('Resposta', activeQuiz.answer.toUpperCase())}\n\n` +
                  `🎁 Prêmio: *+$${rewardCoins.toLocaleString('pt-BR')}* moedas e *+${rewardXp} XP*!${bonusStr} 🏆`;
