@@ -4,6 +4,7 @@ session/
 /cookies.txt
 qrcode.png
 *.png
+!assets/menu-seiha.png
 *.log
 bot_data.sqlite
 bot_data.json

@@ -14,7 +14,7 @@
  * 4. Texto repetido não se copia: usa-se as constantes deste arquivo.
  */
 
-export const BOT_NAME = 'SERIE BOT';
+export const BOT_NAME = 'Seiha';
 
 // ── Textos que se repetiam em dezenas de arquivos ────────────────────────────
 export const TEXTO = {

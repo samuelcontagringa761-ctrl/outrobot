@@ -110,7 +110,7 @@ async function searchWikipedia(query) {
       format: 'json',
       formatversion: 2
     },
-    headers: { 'User-Agent': 'SerieBot/1.0 (WhatsApp bot)' },
+    headers: { 'User-Agent': 'Seiha/1.0 (WhatsApp bot)' },
     timeout: 10000
   });
 
@@ -273,7 +273,7 @@ export async function handleIaCommand(sock, msg, args) {
     const answer = await askAiChat([
       {
         role: 'system',
-        content: 'Você é a IA de pesquisa do Serie Bot. Responda em português do Brasil, com clareza e de forma direta. '
+        content: 'Você é a IA de pesquisa do Seiha. Responda em português do Brasil, com clareza e de forma direta. '
           + 'Leve em conta a conversa anterior para entender perguntas de continuação como "e ele?", "e onde fica?" ou "quem foi ele?". '
           + 'Use os trechos de pesquisa como base principal, mas complete com o seu conhecimento geral quando eles não trouxerem a resposta. '
           + 'Se a resposta vier do seu conhecimento geral e não dos trechos, diga isso em uma frase curta no final. '

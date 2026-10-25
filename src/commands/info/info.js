@@ -6,7 +6,7 @@ export async function handleInfoCommand(sock, msg) {
   const uptimeSeconds = (Date.now() - (global.botStartTime || Date.now())) / 1000;
   const uptimeStr = formatUptime(uptimeSeconds);
 
-  const text = `${cabecalho('🤖', 'Série Bot — Informações')}\n\n` +
+  const text = `${cabecalho('🤖', 'Seiha — Informações')}\n\n` +
                `${linha('Versão', '1.0.0 (Multi-Funções)')}\n` +
                `${linha('Engine', '@whiskeysockets/baileys (ESM)')}\n` +
                `${linha('Banco de dados', 'SQLite + JSON')}\n` +

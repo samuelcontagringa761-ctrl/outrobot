@@ -10,7 +10,7 @@ import { getUser, updateUser, getGroupConfig } from './database/sqlite.js';
 import { formatUptime } from './utils/helpers.js';
 import { calculateBonusRewards } from './utils/bonusCalculator.js';
 import { buildMenu } from './config/menu.js';
-import { erroInterno } from './config/messages.js';
+import { erroInterno, BOT_NAME } from './config/messages.js';
 import dotenv from 'dotenv';
 
 // Importação dos Módulos de Comandos Ativos
@@ -385,48 +385,27 @@ export async function handleMessages(rawSock, msg) {
         uptime: uptimeStr,
       });
 
-      const assetsDir = path.resolve('assets');
-      let videoFiles = [];
+      // Imagem fixa do menu (substitui os GIFs antigos). O menu completo vai
+      // em uma segunda mensagem: o limite de legenda do WhatsApp é 1024
+      // caracteres e o menu tem mais de 4 mil.
+      const menuImagePath = path.resolve('assets', 'menu-seiha.png');
 
-      if (fs.existsSync(assetsDir)) {
-        const filesInAssets = fs.readdirSync(assetsDir)
-          .filter(file => /\.(mp4|gif|webm)$/i.test(file))
-          .map(file => path.join(assetsDir, file));
-        videoFiles.push(...filesInAssets);
+      if (fs.existsSync(menuImagePath)) {
+        try {
+          await sock.sendMessage(from, {
+            image: fs.readFileSync(menuImagePath),
+            caption: `⚡ *${BOT_NAME}*`,
+            mentions: [sender]
+          }, { quoted: msg });
+        } catch (imgErr) {
+          console.warn('⚠️ Falha ao enviar a imagem do menu, enviando só o texto:', imgErr.message);
+        }
       }
 
-      const rootDir = path.resolve('.');
-      const filesInRoot = fs.readdirSync(rootDir)
-        .filter(file => /\.(mp4|gif|webm)$/i.test(file) && (file.startsWith('WhatsApp Video') || file.startsWith('menu')))
-        .map(file => path.join(rootDir, file));
-      videoFiles.push(...filesInRoot);
-
-      videoFiles = [...new Set(videoFiles)];
-
-      if (videoFiles.length > 0) {
-        const randomVideoPath = videoFiles[Math.floor(Math.random() * videoFiles.length)];
-        try {
-          return await sock.sendMessage(from, {
-            video: fs.readFileSync(randomVideoPath),
-            caption: menuText,
-            mentions: [sender],
-            gifPlayback: true,
-            mimetype: 'video/mp4'
-          }, { quoted: msg });
-        } catch (vidErr) {
-          console.warn('⚠️ Falha ao enviar vídeo no menu, enviando como texto:', vidErr.message);
-          try {
-            return await sock.sendMessage(from, { text: menuText, mentions: [sender] }, { quoted: msg });
-          } catch (_) {
-            return await sock.sendMessage(from, { text: menuText, mentions: [sender] });
-          }
-        }
-      } else {
-        try {
-          return await sock.sendMessage(from, { text: menuText, mentions: [sender] }, { quoted: msg });
-        } catch (_) {
-          return await sock.sendMessage(from, { text: menuText, mentions: [sender] });
-        }
+      try {
+        return await sock.sendMessage(from, { text: menuText, mentions: [sender] }, { quoted: msg });
+      } catch (_) {
+        return await sock.sendMessage(from, { text: menuText, mentions: [sender] });
       }
     } else if (command === 'ia') {
       await handleIaCommand(sock, msg, args);

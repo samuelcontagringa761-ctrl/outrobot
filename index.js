@@ -48,7 +48,7 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({
     status: 'online',
-    name: 'Bot WhatsApp',
+    name: 'Seiha',
     uptime_seconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     qr_code_url: '/qr'
@@ -162,7 +162,7 @@ async function startBot() {
       }
     } else if (connection === 'open') {
       console.log('\n╔════════════════════════════════════════╗');
-      console.log('║ 🤖 SERIE BOT CONECTADO COM SUCESSO!     ║');
+      console.log('║ 🤖 SEIHA CONECTADO COM SUCESSO!         ║');
       console.log('║                                        ║');
       console.log('║ Digite os comandos no WhatsApp para    ║');
       console.log('║ interagir com o bot.                   ║');
