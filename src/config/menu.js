@@ -187,3 +187,73 @@ export function buildMenu({
 export function comandosDoMenu() {
   return CATEGORIAS.flatMap((c) => c.comandos.map(([usoCmd]) => usoCmd.split(' ')[0]));
 }
+
+// Limite real da legenda de mídia no WhatsApp é 1.024. Trabalhamos com uma
+// folga para não esbarrar em diferenças de contagem de bytes.
+const LIMITE_LEGENDA = 1000;
+
+// Títulos mais curtos para o menu que vai na legenda da imagem.
+const TITULOS_CURTOS = {
+  'MÍDIA & DOWNLOADS': 'MÍDIA',
+  'INTELIGÊNCIA ARTIFICIAL': 'IA',
+  'ESTUDO & FAMÍLIA': 'ESTUDO',
+  'RPG & BATALHAS': 'RPG',
+  'CASSINO & MINIGAMES': 'CASSINO',
+  'CASAMENTO & SOCIAL': 'SOCIAL',
+  'DIVERSÃO & JOGOS': 'DIVERSÃO',
+  'ADMINISTRAÇÃO DO GRUPO': 'ADMIN',
+  'UTILIDADES & INFORMAÇÕES': 'UTILIDADES'
+};
+
+/** Remove argumentos, menções e alternativas de uso: "ban / kick @pessoa" -> "ban / kick". */
+function comandoCompacto(uso) {
+  return String(uso)
+    .replace(/\s*[<(].*$/, '')
+    .replace(/\s*@.*$/, '')
+    .trim();
+}
+
+/**
+ * Menu compacto para caber na legenda de uma imagem (limite de 1.024
+ * caracteres do WhatsApp). Lista só os nomes dos comandos; as descrições
+ * continuam disponíveis em `/menu completo`.
+ */
+export function buildMenuCompacto({
+  prefixo = '/',
+  usuario = '',
+  saudacao = '👋 Olá',
+  nome = BOT_NAME,
+} = {}) {
+  const linhas = [`⚡ *${nome}*`];
+
+  if (usuario) linhas.push(`${saudacao}, *@${usuario}*!`);
+  linhas.push(`Prefixo: \`${prefixo}\``);
+
+  for (const categoria of CATEGORIAS) {
+    linhas.push('');
+    linhas.push(`${categoria.emoji} *${TITULOS_CURTOS[categoria.titulo] || categoria.titulo}*`);
+    linhas.push(categoria.comandos.map(([usoCmd]) => comandoCompacto(usoCmd)).join(' · '));
+  }
+
+  linhas.push('');
+  linhas.push(`ℹ️ Descrições: \`${prefixo}menu completo\``);
+
+  return linhas.join('\n');
+}
+
+/**
+ * Garante que a legenda nunca passe do limite do WhatsApp. Se o texto base
+ * já for grande (nome de usuário longo, categorias novas), remove a saudação
+ * e, no pior caso, corta em uma quebra de linha e reanexa o aviso.
+ */
+export function buildLegendaMenu(opcoes = {}) {
+  const texto = buildMenuCompacto(opcoes);
+  if (texto.length <= LIMITE_LEGENDA) return texto;
+
+  const semSaudacao = buildMenuCompacto({ ...opcoes, usuario: '', saudacao: '' });
+  if (semSaudacao.length <= LIMITE_LEGENDA) return semSaudacao;
+
+  const corte = semSaudacao.lastIndexOf('\n', LIMITE_LEGENDA - 1);
+  const corpo = semSaudacao.slice(0, corte > 0 ? corte : LIMITE_LEGENDA);
+  return `${corpo}\n\nℹ️ Menu completo: \`${opcoes.prefixo || '/'}menu completo\``;
+}

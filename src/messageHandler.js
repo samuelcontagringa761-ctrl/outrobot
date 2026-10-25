@@ -9,10 +9,10 @@ import { getDatabase } from './database.js';
 import { getUser, updateUser, getGroupConfig } from './database/sqlite.js';
 import { formatUptime } from './utils/helpers.js';
 import { calculateBonusRewards } from './utils/bonusCalculator.js';
-import { buildMenu } from './config/menu.js';
+import { buildMenu, buildLegendaMenu } from './config/menu.js';
 import { handleSeihaCommands } from './commands/seiha/index.js';
 import { activeSimulados, processSimuladoAnswer } from './commands/seiha/simulado.js';
-import { erroInterno, BOT_NAME } from './config/messages.js';
+import { erroInterno } from './config/messages.js';
 import dotenv from 'dotenv';
 
 // Importação dos Módulos de Comandos Ativos
@@ -402,7 +402,7 @@ export async function handleMessages(rawSock, msg) {
     if (['menu', 'help', 'bot'].includes(command)) {
       const uptimeSeconds = (Date.now() - (global.botStartTime || Date.now())) / 1000;
       const uptimeStr = formatUptime(uptimeSeconds);
-      
+
       const timestamp = msg.messageTimestamp;
       const latency = ((Date.now() - (timestamp * 1000)) / 1000).toFixed(3);
       const velocityStr = latency < 0 ? '0.002' : latency;
@@ -416,36 +416,54 @@ export async function handleMessages(rawSock, msg) {
       if (hour >= 5 && hour < 12) greeting = '🌅 Bom dia';
       else if (hour >= 12 && hour < 18) greeting = '☀️ Boa tarde';
 
-      const menuText = buildMenu({
+      // /menu completo: texto detalhado, com descrição de cada comando.
+      const querDetalhado = ['completo', 'detalhado', 'full', 'todos'].includes(
+        String(args[0] || '').toLowerCase()
+      );
+
+      if (querDetalhado) {
+        const menuText = buildMenu({
+          prefixo: prefix,
+          usuario: userNumber,
+          saudacao: greeting,
+          velocidade: velocityStr,
+          uptime: uptimeStr,
+        });
+
+        try {
+          return await sock.sendMessage(from, { text: menuText, mentions: [sender] }, { quoted: msg });
+        } catch (_) {
+          return await sock.sendMessage(from, { text: menuText, mentions: [sender] });
+        }
+      }
+
+      // /menu: uma única mensagem — imagem sorteada com o menu na legenda.
+      const legenda = buildLegendaMenu({
         prefixo: prefix,
         usuario: userNumber,
         saudacao: greeting,
-        velocidade: velocityStr,
-        uptime: uptimeStr,
       });
 
-      // Uma imagem sorteada entre as do menu (substitui os GIFs antigos).
-      // O menu completo vai em uma segunda mensagem: o limite de legenda do
-      // WhatsApp é 1024 caracteres e o menu tem mais de 4 mil.
       const menuImagePath = sortearImagemMenu();
 
       if (menuImagePath) {
         console.log(`[menu] 🖼️ Imagem sorteada: ${path.basename(menuImagePath)}`);
         try {
-          await sock.sendMessage(from, {
+          return await sock.sendMessage(from, {
             image: fs.readFileSync(menuImagePath),
-            caption: `⚡ *${BOT_NAME}*`,
+            caption: legenda,
             mentions: [sender]
           }, { quoted: msg });
         } catch (imgErr) {
-          console.warn('⚠️ Falha ao enviar a imagem do menu, enviando só o texto:', imgErr.message);
+          console.warn('⚠️ Falha ao enviar a imagem do menu, enviando só a legenda:', imgErr.message);
         }
       }
 
+      // Sem imagem ou falha no envio: a mesma legenda vai como texto.
       try {
-        return await sock.sendMessage(from, { text: menuText, mentions: [sender] }, { quoted: msg });
+        return await sock.sendMessage(from, { text: legenda, mentions: [sender] }, { quoted: msg });
       } catch (_) {
-        return await sock.sendMessage(from, { text: menuText, mentions: [sender] });
+        return await sock.sendMessage(from, { text: legenda, mentions: [sender] });
       }
     } else if (command === 'ia') {
       await handleIaCommand(sock, msg, args);
