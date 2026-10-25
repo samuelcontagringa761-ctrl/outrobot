@@ -65,6 +65,32 @@ const prefix = process.env.PREFIX || '/';
 const messageCache = {};
 const CACHE_LIMIT = 500;
 
+// Sorteia uma das imagens do menu (assets/menu-seiha-1.png, -2.jpg, ...).
+// Evita repetir a mesma imagem da chamada anterior, quando houver mais de uma.
+let ultimaImagemMenu = null;
+
+function sortearImagemMenu() {
+  const assetsDir = path.resolve('assets');
+
+  let imagens = [];
+  try {
+    imagens = fs.readdirSync(assetsDir)
+      .filter((arquivo) => /^menu-seiha-\d+\.(png|jpe?g|webp)$/i.test(arquivo))
+      .map((arquivo) => path.join(assetsDir, arquivo));
+  } catch (err) {
+    console.warn('⚠️ Não consegui ler a pasta assets:', err.message);
+    return null;
+  }
+
+  if (imagens.length === 0) return null;
+  if (imagens.length === 1) return imagens[0];
+
+  const opcoes = imagens.filter((imagem) => imagem !== ultimaImagemMenu);
+  const escolhida = opcoes[Math.floor(Math.random() * opcoes.length)] || imagens[0];
+  ultimaImagemMenu = escolhida;
+  return escolhida;
+}
+
 function cacheMessage(from, msg) {
   if (!from || !msg.key?.id || msg.key.fromMe) return;
   
@@ -385,12 +411,13 @@ export async function handleMessages(rawSock, msg) {
         uptime: uptimeStr,
       });
 
-      // Imagem fixa do menu (substitui os GIFs antigos). O menu completo vai
-      // em uma segunda mensagem: o limite de legenda do WhatsApp é 1024
-      // caracteres e o menu tem mais de 4 mil.
-      const menuImagePath = path.resolve('assets', 'menu-seiha.png');
+      // Uma imagem sorteada entre as do menu (substitui os GIFs antigos).
+      // O menu completo vai em uma segunda mensagem: o limite de legenda do
+      // WhatsApp é 1024 caracteres e o menu tem mais de 4 mil.
+      const menuImagePath = sortearImagemMenu();
 
-      if (fs.existsSync(menuImagePath)) {
+      if (menuImagePath) {
+        console.log(`[menu] 🖼️ Imagem sorteada: ${path.basename(menuImagePath)}`);
         try {
           await sock.sendMessage(from, {
             image: fs.readFileSync(menuImagePath),
